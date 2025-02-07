@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Subtitle Converter</title>
+</head>
+<body>
+    <h2>Subtitle Converter</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="subtitle">Upload Subtitle:</label>
+        <input type="file" name="subtitle" required><br>
+
+        <label for="format">Convert to:</label>
+        <select name="format" required>
+            <option value="srt">SRT</option>
+            <option value="ass">ASS</option>
+            <option value="ssa">SSA</option>
+            <option value="vtt">VTT</option>
+            <option value="sub">SUB</option>
+        </select><br>
+
+        <label for="custom_filename">Custom Filename (Optional):</label>
+        <input type="text" name="custom_filename" placeholder="converted"><br>
+
+        <button type="submit">Convert & Download</button>
+    </form>
+</body>
+</html>
