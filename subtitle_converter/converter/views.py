@@ -4,14 +4,16 @@ import pysubs2
 import os
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-
 def subtitle_convert(request):
     if request.method == 'POST' and request.FILES['subtitle']:
         # 获取上传的文件
         subtitle_file = request.FILES['subtitle']
-        subtitle_format = request.POST['format']
+        subtitle_format = request.POST['format']        
+        # 获取自定义文件名，如果没有提供就使用原文件名
         custom_filename = request.POST.get('custom_filename', 'converted')
-
+        if not custom_filename:
+            custom_filename = os.path.splitext(subtitle_file.name)[0]  # 使用上传文件的原始文件名（去除扩展名）
+        
         # 保存上传的文件到临时路径
         temp_path = default_storage.save(subtitle_file.name, ContentFile(subtitle_file.read()))
 
