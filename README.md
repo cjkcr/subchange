@@ -1,5 +1,5 @@
 # subchange
-This is a website using Django that can convert subtitle files between SRT, ASS, SSA, VTT, and SUB formats.
+This is a website using Django that can convert subtitle files between SRT, ASS, SSA, and VTT formats.
 
 ## 项目说明
 该项目是一个基于 Django 的网站应用，可以在 SRT、ASS、SSA和VTT格式之间转换字幕文件。
