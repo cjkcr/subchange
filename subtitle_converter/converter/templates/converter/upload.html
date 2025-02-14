@@ -1,28 +1,62 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subtitle Format Converter</title>
     <style>
         @keyframes dots {
-        0% { content: ".."; }
-        10% { content: "...."; }
-        20% { content: "......"; }
-        30% { content: "........"; }
-        40% { content: ".........."; }
-        50% { content: "............"; }
-        60% { content: ".............."; }
-        70% { content: "................"; }
-        80% { content: ".................."; }
-        90% { content: "...................."; }
-        100% { content: "......................"; }
-    }
+            0% {
+                content: "...";
+            }
 
-    #translating-indicator:after {
-        content: "...";
-        animation: dots 20s steps(10, end) infinite;
-    }
+            10% {
+                content: "......";
+            }
+
+            20% {
+                content: ".........";
+            }
+
+            30% {
+                content: "..............";
+            }
+
+            40% {
+                content: "..................";
+            }
+
+            50% {
+                content: "....................";
+            }
+
+            60% {
+                content: "......................";
+            }
+
+            70% {
+                content: "..........................";
+            }
+
+            80% {
+                content: "............................";
+            }
+
+            90% {
+                content: "..............................";
+            }
+
+            100% {
+                content: "................................";
+            }
+        }
+
+        #translating-indicator:after {
+            content: "...";
+            animation: dots 20s steps(10, end) infinite;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -81,31 +115,37 @@
         button:hover {
             background-color: #0056b3;
         }
+
         #translating-container {
             display: flex;
-            align-items: center; /* 垂直居中 */
+            align-items: center;
+            /* 垂直居中 */
             padding-top: 10px;
             padding-left: 10px;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
             height: 32px;
-            text-align:left;
+            text-align: left;
             color: #db1313;
         }
-        #download-link-container{
+
+        #download-link-container {
             height: 32px;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
             width: 50%;
             padding-top: 10px;
-            padding-left: 10px;  
-            background-color: #ADD8E6;        
+            padding-left: 10px;
+            background-color: #ADD8E6;
         }
+
         #download-link {
-            color: goldenrod; /* 设置下载链接的颜色为金色 */
+            color: goldenrod;
+            /* 设置下载链接的颜色为金色 */
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h4>Subtitle Format Converter</h4>
@@ -146,8 +186,8 @@
         <div id="download-link-container" style="display:none; margin-top: 30px;">
             <a id="download-link" href="#">下载已转换的字幕</a>
         </div>
-    
-        
+
+
     </div>
     <!-- <script>
         // 监听表单提交
@@ -190,7 +230,7 @@
         };
     </script> -->
     <script>
-        document.getElementById('convert-form').addEventListener('submit', function(e) {
+        document.getElementById('convert-form').addEventListener('submit', function (e) {
             e.preventDefault();
 
             const form = this;
@@ -208,7 +248,7 @@
             xhr.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
 
 
-            xhr.onload = function() {
+            xhr.onload = function () {
                 if (xhr.status === 200) {
                     translatingContainer.style.display = 'none';
                     downloadLinkContainer.style.display = 'block';
@@ -221,8 +261,8 @@
                     downloadLink.textContent = '点击下载: ' + filename;
 
                     // 添加点击下载链接后的延时重置功能
-                    downloadLink.addEventListener('click', function() {
-                        setTimeout(function() {
+                    downloadLink.addEventListener('click', function () {
+                        setTimeout(function () {
                             downloadLinkContainer.style.display = 'none'; // 隐藏下载链接
                             form.reset(); // 重置表单，包括文件选择
                         }, 3000); // 3秒后执行
@@ -234,7 +274,7 @@
                 }
             };
 
-            xhr.onerror = function() {
+            xhr.onerror = function () {
                 alert('上传或转换过程中发生错误。');
                 translatingContainer.style.display = 'none';
             };
@@ -244,4 +284,5 @@
         });
     </script>
 </body>
+
 </html>
