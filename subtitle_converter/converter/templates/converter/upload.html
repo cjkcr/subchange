@@ -1,122 +1,247 @@
 <!DOCTYPE html>
 <html>
-<style>
-    body {
-        margin: 0;
-        padding: 0;
-        background-color: #ADD8E6;
-        font-family: Arial, sans-serif;
-    }
-    .container {
-        width: 50%;
-        margin: 0 auto;
-        padding: 20px;
-        padding-bottom: 50px;
-        background-color: #ffFFEFC8;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        margin-top: 50px;
-    }
-    h4 {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    form {
-        display: flex;
-        flex-direction: column;
-    }
-    label {
-        margin-bottom: 5px;
-    }
-    input[type="file"] {
-        margin-bottom: 10px;
-    }
-    select {
-        margin-bottom: 10px;
-        height: 30px;
-    }
-    input[type="text"] {
-        margin-bottom: 10px;
-        height: 25px;
-    }
-    button {
-        padding: 10px;
-        background-color: #007bff;
-        color: #fff;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-    button:hover {
-        background-color: #0056b3;
-    }
-</style>
 <head>
-    <title>字幕格式转换</title>
-    <!-- <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Format Converter</title>
+    <style>
+        @keyframes dots {
+        0% { content: ".."; }
+        10% { content: "...."; }
+        20% { content: "......"; }
+        30% { content: "........"; }
+        40% { content: ".........."; }
+        50% { content: "............"; }
+        60% { content: ".............."; }
+        70% { content: "................"; }
+        80% { content: ".................."; }
+        90% { content: "...................."; }
+        100% { content: "......................"; }
+    }
+
+    #translating-indicator:after {
+        content: "...";
+        animation: dots 20s steps(10, end) infinite;
+    }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #ADD8E6;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            width: 50%;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: 50px;
+            background-color: #ffFFEFC8;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-top: 50px;
+        }
+
+        h4 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 5px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+
+        select {
+            margin-bottom: 10px;
+            height: 30px;
+        }
+
+        input[type="text"] {
+            margin-bottom: 10px;
+            height: 25px;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        #translating-container {
+            display: flex;
+            align-items: center; /* 垂直居中 */
+            padding-top: 10px;
+            padding-left: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            height: 32px;
+            text-align:left;
+            color: #db1313;
+        }
+        #download-link-container{
+            height: 32px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+            width: 50%;
+            padding-top: 10px;
+            padding-left: 10px;  
+            background-color: #ADD8E6;        
+        }
+        #download-link {
+            color: goldenrod; /* 设置下载链接的颜色为金色 */
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h4>字幕格式转换</h4>
+        <h4>Subtitle Format Converter</h4>
         <form id="convert-form" method="POST" enctype="multipart/form-data">
             {% csrf_token %}
             <label for="subtitle">Upload Subtitle:</label>
             <input type="file" name="subtitle" required><br>
+
+            <!-- 选择目标语言的下拉菜单 -->
+            <label for="target_language">Choose Target Language:</label>
+            <select name="target_language" id="target_language">
+                <option value="none">No Translation</option>
+                <option value="en">English</option>
+                <option value="zh-cn">Chinese</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <!-- 其他语言可以按需添加 -->
+            </select><br><br>
+
             <label for="format">Convert to:</label>
             <select name="format" required>
                 <option value="srt">SRT</option>
                 <option value="ass">ASS</option>
                 <option value="ssa">SSA</option>
                 <option value="vtt">VTT</option>
-            </select><br>
+                <option value="sub">SUB</option>
+            </select><br><br>
+
+            <!-- 自定义文件名 -->
             <label for="custom_filename">Custom Filename (Optional):</label>
-            <input type="text" name="custom_filename" placeholder="converted"><br>
+            <input type="text" name="custom_filename" placeholder="converted"><br><br>
+
             <button type="submit">Convert & Download</button>
         </form>
-        <script>
-            // 监听表单提交
-            document.getElementById('convert-form').onsubmit = function (e) {
-                e.preventDefault(); // 防止表单默认提交
-
-                // 使用FormData将表单数据提交给后端
-                var formData = new FormData(this);
-
-                // 提交表单
-                fetch('/converter/', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(response => {
-                        // 获取文件名
-                        const contentDisposition = response.headers.get('Content-Disposition');
-                        const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
-                        const fileName = fileNameMatch ? fileNameMatch[1] : 'converted_subtitle.srt';  // 默认文件名
-
-                        // 获取文件内容
-                        return response.blob().then(blob => ({ blob, fileName }));
-                    })
-                    .then(({ blob, fileName }) => {
-                        // 创建下载链接
-                        const link = document.createElement('a');
-                        const url = URL.createObjectURL(blob);
-                        link.href = url;
-                        link.download = fileName;  // 使用从响应中提取的文件名
-                        link.click();  // 触发下载
-
-                        // 等待 3 秒后刷新页面
-                        setTimeout(function () {
-                            location.reload();  // 3秒后刷新页面
-                        }, 3000);
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-            };
-        </script>
+        <div id="translating-container" style="display:none; margin-top: 30px;">
+            <span id="translating-indicator">正在翻译中</span>
+        </div>
+        <div id="download-link-container" style="display:none; margin-top: 30px;">
+            <a id="download-link" href="#">下载已转换的字幕</a>
+        </div>
+    
+        
     </div>
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-</body>
+    <!-- <script>
+        // 监听表单提交
+        document.getElementById('convert-form').onsubmit = function (e) {
+            e.preventDefault(); // 防止表单默认提交
 
+            // 使用FormData将表单数据提交给后端
+            var formData = new FormData(this);
+
+            // 提交表单
+            fetch('/converter/', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    // 获取文件名
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
+                    const fileName = fileNameMatch ? fileNameMatch[1] : 'converted_subtitle.srt';  // 默认文件名
+
+                    // 获取文件内容
+                    return response.blob().then(blob => ({ blob, fileName }));
+                })
+                .then(({ blob, fileName }) => {
+                    // 创建下载链接
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.href = url;
+                    link.download = fileName;  // 使用从响应中提取的文件名
+                    link.click();  // 触发下载
+
+                    // 等待 3 秒后刷新页面
+                    setTimeout(function () {
+                        location.reload();  // 3秒后刷新页面
+                    }, 3000);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        };
+    </script> -->
+    <script>
+        document.getElementById('convert-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const form = this;
+            const formData = new FormData(form);
+
+            const translatingContainer = document.getElementById('translating-container');
+            const downloadLinkContainer = document.getElementById('download-link-container');
+            const downloadLink = document.getElementById('download-link');
+
+            translatingContainer.style.display = 'block';
+            downloadLinkContainer.style.display = 'none';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', form.action);
+            xhr.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
+
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    translatingContainer.style.display = 'none';
+                    downloadLinkContainer.style.display = 'block';
+
+                    const filename = xhr.getResponseHeader('Content-Disposition').split('filename=')[1].replace(/"/g, '');
+                    const blob = new Blob([xhr.response], { type: 'text/plain' });
+                    const url = window.URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = filename;
+                    downloadLink.textContent = '点击下载: ' + filename;
+
+                    // 添加点击下载链接后的延时重置功能
+                    downloadLink.addEventListener('click', function() {
+                        setTimeout(function() {
+                            downloadLinkContainer.style.display = 'none'; // 隐藏下载链接
+                            form.reset(); // 重置表单，包括文件选择
+                        }, 3000); // 3秒后执行
+                    });
+
+                } else {
+                    alert('转换失败，请重试。');
+                    translatingContainer.style.display = 'none';
+                }
+            };
+
+            xhr.onerror = function() {
+                alert('上传或转换过程中发生错误。');
+                translatingContainer.style.display = 'none';
+            };
+
+            xhr.responseType = 'blob';
+            xhr.send(formData);
+        });
+    </script>
+</body>
 </html>

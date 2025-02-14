@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Converter</title>
+</head>
+<body>
+    <h2>Subtitle Converter</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <!-- 上传字幕文件 -->
+        <label for="subtitle">Upload Subtitle:</label>
+        <input type="file" name="subtitle" required><br><br>
+
+        <!-- 目标语言选择 -->
+        <label for="target_language">Choose Target Language:</label>
+        <select name="target_language" id="target_language">
+            <option value="none">No Translation</option>
+            <option value="en">English</option>
+            <option value="zh">Chinese</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <!-- 可以根据需求添加更多语言 -->
+        </select><br><br>
+
+        <!-- 输出格式选择 -->
+        <label for="output_format">Choose Output Format:</label>
+        <select name="output_format" id="output_format">
+            <option value="srt">SRT</option>
+            <option value="ass">ASS</option>
+            <option value="ssa">SSA</option>
+            <option value="vtt">VTT</option>
+            <option value="sub">SUB</option>
+        </select><br><br>
+
+        <!-- 自定义文件名 -->
+        <label for="custom_name">Custom File Name (Optional):</label>
+        <input type="text" name="custom_name" placeholder="Enter custom file name"><br><br>
+
+        <!-- 提交按钮 -->
+        <button type="submit">Convert & Download</button>
+    </form>
+</body>
+</html>
