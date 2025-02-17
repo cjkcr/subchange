@@ -11,7 +11,8 @@ import re
 async def translate_text_bulk(texts, target_language):
     """
     使用 googletrans 批量翻译文本列表到目标语言.
-    在翻译前后都进行文本清洗，彻底移除多余的回车、转义字符和孤立的 'n'、'\N'。
+    在翻译前后都进行文本清洗，彻底移除多余的回车、转义字符和孤立的 'n'、'\\N'。
+
     """
     translator = Translator()
     try:
