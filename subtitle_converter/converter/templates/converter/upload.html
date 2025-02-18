@@ -6,55 +6,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subtitle Format Converter</title>
     <style>
-        @keyframes dots {
+        /* 外部进度条容器 */
+        #translating-container {
+            position: relative;
+            width: 100%;
+            height: 30px;
+            background-color: #ddd;
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+            /* 隐藏容器 */
+            margin-top: 30px;
+        }
+
+        /* 内部进度条 */
+        #translating-indicator {
+            display: inline-block;
+            height: 100%;
+            width: 0%;
+            /* 初始宽度 */
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            border-radius: 12px 0 0 12px;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+            font-weight: bold;
+            animation: progress-animation 20s linear infinite;
+            /* 设置动画 */
+        }
+
+        /* 动画设置：进度条宽度更新 */
+        @keyframes progress-animation {
             0% {
-                content: "...";
-            }
-
-            10% {
-                content: "......";
-            }
-
-            20% {
-                content: ".........";
-            }
-
-            30% {
-                content: "..............";
-            }
-
-            40% {
-                content: "..................";
-            }
-
-            50% {
-                content: "....................";
-            }
-
-            60% {
-                content: "......................";
-            }
-
-            70% {
-                content: "..........................";
-            }
-
-            80% {
-                content: "............................";
-            }
-
-            90% {
-                content: "..............................";
+                width: 0%;
             }
 
             100% {
-                content: "................................";
+                width: 100%;
             }
         }
 
-        #translating-indicator:after {
-            content: "...";
-            animation: dots 20s steps(10, end) infinite;
+        /* 内部进度条文本 */
+        #translating-indicator::after {
+            content: '正在翻译中...';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            font-style: italic;
+            color: white;
+            font-weight: bold;
+            animation: text-animation 60s linear infinite;
+        }
+
+        /* 动画设置：更新文本 */
+        @keyframes text-animation {
+            0% {
+                content: 'Translation in progress...';
+            }
+
+            30% {
+                content: 'Translation in progress';
+            }
+
+            60% {
+                content: 'wait a minute......';
+            }
+
+            80% {
+                content: 'Still waiting......';
+            }
+
+            100% {
+                content: 'Waiting... a long wait......';
+            }
         }
 
         body {
@@ -74,6 +100,26 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             margin-top: 50px;
         }
+        P {
+            font-size: 14px;
+            margin-top: 0px;
+            margin-bottom: 5px;
+            opacity: 0.6;
+        }
+        footer {
+            width: 50%;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: 50px;
+            /* background-color: #ffFFEFC8; */
+            border-radius: 5px;
+            /* box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); */
+            text-align: left;
+            margin-top: 0px;
+            opacity: 0.4;
+            font-size: 16px;
+        }
+        
 
         h4 {
             text-align: center;
@@ -88,6 +134,7 @@
         label {
             margin-bottom: 5px;
         }
+        
 
         input[type="file"] {
             margin-bottom: 10px;
@@ -96,11 +143,18 @@
         select {
             margin-bottom: 10px;
             height: 30px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+
         }
 
         input[type="text"] {
             margin-bottom: 10px;
             height: 25px;
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+
         }
 
         button {
@@ -116,21 +170,8 @@
             background-color: #0056b3;
         }
 
-        #translating-container {
-            display: flex;
-            align-items: center;
-            /* 垂直居中 */
-            padding-top: 10px;
-            padding-left: 10px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-            height: 32px;
-            text-align: left;
-            color: #db1313;
-        }
-
         #download-link-container {
-            height: 32px;
+            height: 28px;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
             width: auto;
@@ -148,7 +189,7 @@
 
 <body>
     <div class="container">
-        <h4>Subtitle Format Converter</h4>
+        <h4>Subtitle format conversion and translation</h4>
         <form id="convert-form" method="POST" enctype="multipart/form-data">
             {% csrf_token %}
             <label for="subtitle">Upload Subtitle:</label>
@@ -163,7 +204,9 @@
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
                 <!-- 其他语言可以按需添加 -->
-            </select><br><br>
+            </select>
+            <p><em>Only supports translation of STR format files.</em><br>    
+            <em>Can only generate dual-language subtitles.</em></p><br>
 
             <label for="format">Convert to:</label>
             <select name="format" required>
@@ -181,14 +224,23 @@
             <button type="submit">Convert & Download</button>
         </form>
         <div id="translating-container" style="display:none; margin-top: 30px;">
-            <span id="translating-indicator">正在翻译中</span>
+            <span id="translating-indicator"></span>
         </div>
         <div id="download-link-container" style="display:none; margin-top: 30px;">
             <a id="download-link" href="#">下载已转换的字幕</a>
         </div>
+        
 
 
     </div>
+    <footer>
+        <p><em>file would NOT be uploaded to anywhere.</em> </p>
+        <p><em>Powered by <a href="https://www.djangoproject.com/"
+                         title="The Python Programming Language">Django</a>
+          and a set of lovely open-source projects.</em></p>
+        <p><em>Source code is avaiable on
+          <a href="https://github.com/cjkcr/subchange">GitHub</a>.</em></p>
+      </footer>
     <!-- <script>
         // 监听表单提交
         document.getElementById('convert-form').onsubmit = function (e) {

@@ -18,7 +18,7 @@ async def translate_text_bulk(texts, target_language):
     try:
         cleaned_texts = []
         for text in texts:
-            print(f"原文片段 (清洗前): {text}") # 打印清洗前的原文片段
+            # print(f"原文片段 (清洗前): {text}") # 打印清洗前的原文片段
             # 1. 翻译前清洗：移除多余的反斜杠转义字符和回车符
             cleaned_text = text.replace('\\\\', '')
             cleaned_text = cleaned_text.replace('\\N', ' ')
@@ -27,7 +27,7 @@ async def translate_text_bulk(texts, target_language):
             cleaned_text = cleaned_text.replace('\r\n', ' ')
             cleaned_text = cleaned_text.replace('\\n', ' ')
             
-            print(f"原文片段 (清洗后): {cleaned_text}") # 打印清洗后的原文片段
+            # print(f"原文片段 (清洗后): {cleaned_text}") # 打印清洗后的原文片段
             cleaned_texts.append(cleaned_text)
 
         # 批量翻译清洗后的文本列表
@@ -37,7 +37,7 @@ async def translate_text_bulk(texts, target_language):
 
         translated_texts_post_clean = [] # 存储最终清洗后的翻译文本
         for text in translated_texts_pre_clean:
-            print(f"翻译结果 (清洗前): {text}") # 打印翻译结果清洗前的文本
+            # print(f"翻译结果 (清洗前): {text}") # 打印翻译结果清洗前的文本
             # 2. 翻译后清洗：移除孤立的 'n' 字符
             cleaned_text = re.sub(r'\bn\b', '', text, flags=re.IGNORECASE) # 使用正则移除单词边界的 'n' (忽略大小写)
             cleaned_text = cleaned_text.replace('  ', ' ') #  移除多余的空格，避免因移除 'n' 产生双空格
@@ -45,7 +45,7 @@ async def translate_text_bulk(texts, target_language):
             cleaned_text = cleaned_text.replace('{\i1}，', '{\i1}')
             cleaned_text = cleaned_text.replace('{\ i0}', '{\i0}')
             cleaned_text = cleaned_text.strip() # 移除首尾空格
-            print(f"翻译结果 (清洗后): {cleaned_text}") # 打印翻译结果清洗后的文本
+            # print(f"翻译结果 (清洗后): {cleaned_text}") # 打印翻译结果清洗后的文本
             translated_texts_post_clean.append(cleaned_text)
 
         return translated_texts_post_clean, cleaned_texts # 返回最终清洗后的翻译文本
@@ -135,7 +135,7 @@ async def subtitle_convert_and_download(subs, subtitle_format, response_filename
             
             # 构建双语字幕行：原始文本 + 换行符 + 翻译文本
             line.text = translated_text_line + "\n" + cleaned_text_line
-            print(f"双语字幕行: {line.text}") # 打印双语字幕行
+            # print(f"双语字幕行: {line.text}") # 打印双语字幕行
 
     # 后续处理 (保存文件和返回 response) 与之前代码相同
     converted_file_path = f"/tmp/{response_filename}"
