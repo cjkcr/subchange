@@ -122,3 +122,34 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': '/tmp/subtitle_converter.log', #  日志文件路径
+            'encoding': 'utf-8',
+            'formatter': 'standard',
+        },
+        'console': { #  可选的控制台输出
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - %(levelname)s - %(module)s - %(message)s'
+        },
+    },
+    'loggers': {
+        'converter': { #  你的 converter 应用的 logger
+            'handlers': ['file', 'console'], #  同时输出到文件和控制台 (可选)
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}

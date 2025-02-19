@@ -7,6 +7,9 @@ from django.core.files.base import ContentFile
 from googletrans import Translator
 import asyncio
 import re
+import logging
+
+logger = logging.getLogger("converter")
 
 async def translate_text_bulk(texts, target_language):
     """
@@ -56,6 +59,8 @@ async def translate_text_bulk(texts, target_language):
         return texts
 
 async def subtitle_convert_and_download(subs, subtitle_format, response_filename, target_language):
+
+    
     """
     将字幕转换为指定格式并提供下载，实现批量翻译和双语字幕。
     :param subs: pysubs2 字幕对象
@@ -153,10 +158,11 @@ async def subtitle_convert_and_download(subs, subtitle_format, response_filename
 
     with open(converted_file_path, 'rb') as f:
         converted_subtitle = f.read()
-
-    response = HttpResponse(converted_subtitle, content_type='text/plain')
+    # 准备下载文件
+    response = HttpResponse(converted_subtitle, content_type='text/plain') 
     response['Content-Disposition'] = f'attachment; filename="{response_filename}"'
-
+    # 下载准备日志记录 
+    logger.info(f"字幕文件 '{response_filename}' 译成 '{target_language}' 以 '{subtitle_format}' 格式转换成功，准备提供下载。")
     os.remove(converted_file_path)
     return response
 
