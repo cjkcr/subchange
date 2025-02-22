@@ -100,12 +100,14 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             margin-top: 50px;
         }
+
         P {
             font-size: 14px;
             margin-top: 0px;
             margin-bottom: 5px;
             opacity: 0.6;
         }
+
         footer {
             width: 50%;
             margin: 0 auto;
@@ -119,7 +121,7 @@
             opacity: 0.4;
             font-size: 16px;
         }
-        
+
 
         h4 {
             text-align: center;
@@ -134,7 +136,7 @@
         label {
             margin-bottom: 5px;
         }
-        
+
 
         input[type="file"] {
             margin-bottom: 10px;
@@ -205,8 +207,9 @@
                 <option value="fr">French</option>
                 <!-- 其他语言可以按需添加 -->
             </select>
-            <p><em>Only supports translation of STR format files.</em><br>    
-            <em>Can only generate dual-language subtitles.</em></p><br>
+            <p><em>Only supports translation of STR format files.</em><br>
+                <em>Can only generate dual-language subtitles.</em>
+            </p><br>
 
             <label for="format">Convert to:</label>
             <select name="format" required>
@@ -229,18 +232,17 @@
         <div id="download-link-container" style="display:none; margin-top: 30px;">
             <a id="download-link" href="#">下载已转换的字幕</a>
         </div>
-        
+
 
 
     </div>
     <footer>
         <p><em>file would NOT be uploaded to anywhere.</em> </p>
-        <p><em>Powered by <a href="https://www.djangoproject.com/"
-                         title="The Python Programming Language">Django</a>
-          and a set of lovely open-source projects.</em></p>
+        <p><em>Powered by <a href="https://www.djangoproject.com/" title="The Python Programming Language">Django</a>
+                and a set of lovely open-source projects.</em></p>
         <p><em>Source code is avaiable on
-          <a href="https://github.com/cjkcr/subchange">GitHub</a>.</em></p>
-      </footer>
+                <a href="https://github.com/cjkcr/subchange">GitHub</a>.</em></p>
+    </footer>
     <!-- <script>
         // 监听表单提交
         document.getElementById('convert-form').onsubmit = function (e) {
@@ -281,7 +283,7 @@
                 });
         };
     </script> -->
-    <script>
+    <!-- <script>
         document.getElementById('convert-form').addEventListener('submit', function (e) {
             e.preventDefault();
 
@@ -320,6 +322,74 @@
                         }, 3000); // 3秒后执行
                     });
 
+                } else {
+                    alert('转换失败，请重试。');
+                    translatingContainer.style.display = 'none';
+                }
+            };
+
+            xhr.onerror = function () {
+                alert('上传或转换过程中发生错误。');
+                translatingContainer.style.display = 'none';
+            };
+
+            xhr.responseType = 'blob';
+            xhr.send(formData);
+        });
+    </script> -->
+    <script>
+        document.getElementById('convert-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const form = this;
+            const formData = new FormData(form);
+
+            const translatingContainer = document.getElementById('translating-container');
+            const downloadLinkContainer = document.getElementById('download-link-container');
+            const downloadLink = document.getElementById('download-link');
+
+            translatingContainer.style.display = 'block';
+            downloadLinkContainer.style.display = 'none';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', form.action || '/converter/'); // 确保 action 有默认值
+            xhr.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
+
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    translatingContainer.style.display = 'none';
+                    downloadLinkContainer.style.display = 'block';
+
+                    // 获取 Content-Disposition 头部
+                    const contentDisposition = xhr.getResponseHeader('Content-Disposition');
+                    let filename = 'converted_subtitle.srt'; // 默认文件名
+
+                    // 优先尝试提取 filename* 参数（支持 UTF-8 编码）
+                    const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
+                    if (filenameStarMatch && filenameStarMatch[1]) {
+                        filename = decodeURIComponent(filenameStarMatch[1]);
+                    } else {
+                        // 回退到 filename 参数
+                        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = decodeURIComponent(filenameMatch[1]);
+                        }
+                    }
+
+                    // 创建 Blob 并设置下载链接
+                    const blob = new Blob([xhr.response], { type: 'text/plain' });
+                    const url = window.URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = filename;
+                    downloadLink.textContent = '点击下载: ' + filename;
+
+                    // 添加点击下载链接后的延时重置功能
+                    downloadLink.addEventListener('click', function () {
+                        setTimeout(function () {
+                            downloadLinkContainer.style.display = 'none'; // 隐藏下载链接
+                            form.reset(); // 重置表单，包括文件选择
+                        }, 3000); // 3秒后执行
+                    });
                 } else {
                     alert('转换失败，请重试。');
                     translatingContainer.style.display = 'none';

@@ -8,6 +8,7 @@ from googletrans import Translator
 import asyncio
 import re
 import logging
+from urllib.parse import quote
 
 logger = logging.getLogger("converter")
 
@@ -160,7 +161,17 @@ async def subtitle_convert_and_download(subs, subtitle_format, response_filename
         converted_subtitle = f.read()
     # 准备下载文件
     response = HttpResponse(converted_subtitle, content_type='text/plain') 
-    response['Content-Disposition'] = f'attachment; filename="{response_filename}"'
+
+    # 对文件名进行 URL 编码
+    encoded_filename = quote(response_filename.encode('utf-8'))
+
+    # 设置 Content-Disposition 头
+    response['Content-Disposition'] = (f'attachment; filename="{encoded_filename}";'f'filename*=UTF-8\'\'{encoded_filename}')   
+   
+
+
+    # 使用 quote() 对文件名进行 URL 编码
+    # response['Content-Disposition'] = f'attachment; filename="{quote(response_filename)}"'
     # 下载准备日志记录 
     logger.info(f"字幕文件 '{response_filename}' 译成 '{target_language}' 以 '{subtitle_format}' 格式转换成功，准备提供下载。")
     os.remove(converted_file_path)
