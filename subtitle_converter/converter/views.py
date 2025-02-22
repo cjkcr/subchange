@@ -9,6 +9,7 @@ import asyncio
 import re
 import logging
 from urllib.parse import quote
+import uuid
 
 logger = logging.getLogger("converter")
 
@@ -59,7 +60,7 @@ async def translate_text_bulk(texts, target_language):
         # 如果翻译失败，返回原始文本列表，保证后续处理不中断
         return texts
 
-async def subtitle_convert_and_download(subs, subtitle_format, response_filename, target_language):
+async def subtitle_convert_and_download(subs, subtitle_format, custom_filename, target_language):
 
     
     """
@@ -144,6 +145,15 @@ async def subtitle_convert_and_download(subs, subtitle_format, response_filename
             # print(f"双语字幕行: {line.text}") # 打印双语字幕行
 
     # 后续处理 (保存文件和返回 response) 与之前代码相同
+    # 生成唯一的文件名
+    unique_id = uuid.uuid4().hex[:8]  # 使用 UUID 的前 8 位，确保唯一性且文件名长度适中
+    if custom_filename:
+        # 如果用户提供了自定义文件名，将其与 UUID 结合
+        response_filename = f"{custom_filename}_{unique_id}.{subtitle_format}"
+    else:
+        # 如果没有自定义文件名，使用默认前缀加上 UUID
+        response_filename = f"converted_{unique_id}.{subtitle_format}"
+
     converted_file_path = f"/tmp/{response_filename}"
 
     if subtitle_format == 'srt':
@@ -190,7 +200,9 @@ async def subtitle_convert(request):
         temp_path = default_storage.save(subtitle_file.name, ContentFile(subtitle_file.read()))
         subs = pysubs2.load(temp_path)
 
-        response = await subtitle_convert_and_download(subs, subtitle_format, f"{custom_filename}.{subtitle_format}", target_language)
+        response = await subtitle_convert_and_download(subs, subtitle_format, custom_filename, target_language)
+
+        # response = await subtitle_convert_and_download(subs, subtitle_format, f"{custom_filename}.{subtitle_format}", target_language)
 
         default_storage.delete(temp_path)
         return response
