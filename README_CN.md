@@ -1,6 +1,6 @@
 # Subchange
 
-<div align="right">
+<div align="left">
   <a href="./README.md">English</a> · <strong>简体中文</strong>
 </div>
 
