@@ -197,7 +197,7 @@
         <form id="convert-form" method="POST" enctype="multipart/form-data">
             {% csrf_token %}
             <label for="subtitle">Upload Subtitle:</label>
-            <input type="file" name="subtitle" required><br>
+            <input type="file" name="subtitle" accept=".srt,.ass,.ssa,.vtt" required><br>
 
             <!-- 选择目标语言的下拉菜单 -->
             <label for="target_language">Choose Target Language:</label>
@@ -216,7 +216,7 @@
                     <option value="translated">Translation Only</option>
                 </select>
             </div>
-            <p><em>Only supports translation of SRT format files.</em><br>
+            <p><em>Translation supports SRT, ASS, SSA, and VTT files.</em><br>
                 <em>Choose bilingual or translation-only output.</em>
             </p><br>
 
