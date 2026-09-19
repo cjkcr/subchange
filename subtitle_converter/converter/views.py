@@ -17,7 +17,7 @@ TRANSLATION_BATCH_ITEMS = 20
 TRANSLATION_BATCH_CHARS = 1800
 TRANSLATION_TOTAL_TIMEOUT = 240
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
-SUPPORTED_EXTENSIONS = {'.srt', '.ass', '.ssa', '.vtt', '.sub'}
+SUPPORTED_EXTENSIONS = {'.srt', '.ass', '.ssa', '.vtt'}
 SUPPORTED_TARGET_LANGUAGES = {'none', 'en', 'zh-cn', 'es', 'fr'}
 SUPPORTED_TRANSLATION_MODES = {'bilingual', 'translated'}
 
@@ -150,7 +150,7 @@ async def subtitle_convert_and_download(
     """
     将字幕转换为指定格式并提供下载，实现批量翻译和双语字幕。
     :param subs: pysubs2 字幕对象
-    :param subtitle_format: 用户选择的输出格式 (srt, ass, ssa, vtt, sub)
+    :param subtitle_format: 用户选择的输出格式 (srt, ass, ssa, vtt)
     :param response_filename: 转换后的字幕文件名
     :param target_language: 用户选择的目标语言（如 'en'，'zh' 等）
     :param translation_mode: bilingual 为译文加原文，translated 为仅保留译文
@@ -287,7 +287,7 @@ async def subtitle_convert(request):
         subtitle_format = request.POST.get('format', 'srt')
         target_language = request.POST.get('target_language', 'none')
         translation_mode = request.POST.get('translation_mode', 'bilingual')
-        if subtitle_format not in {'srt', 'ass', 'ssa', 'vtt', 'sub'}:
+        if subtitle_format not in {'srt', 'ass', 'ssa', 'vtt'}:
             return HttpResponse("不支持的输出格式", status=400)
         if target_language not in SUPPORTED_TARGET_LANGUAGES:
             return HttpResponse("不支持的目标语言", status=400)
