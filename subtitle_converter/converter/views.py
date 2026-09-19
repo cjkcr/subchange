@@ -2,24 +2,82 @@ from django.shortcuts import render
 from django.http import HttpResponse
 import pysubs2
 import os
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from googletrans import Translator
 import asyncio
 import re
 import logging
+import requests
+import tempfile
 from urllib.parse import quote
 import uuid
 
 logger = logging.getLogger("converter")
 
+GOOGLE_TRANSLATE_URL = "https://clients5.google.com/translate_a/t"
+TRANSLATION_BATCH_ITEMS = 20
+TRANSLATION_BATCH_CHARS = 1800
+TRANSLATION_TOTAL_TIMEOUT = 240
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+SUPPORTED_EXTENSIONS = {'.srt', '.ass', '.ssa', '.vtt', '.sub'}
+SUPPORTED_TARGET_LANGUAGES = {'none', 'en', 'zh-cn', 'es', 'fr'}
+
+
+class TranslationError(Exception):
+    """Raised when the upstream translation service cannot return valid data."""
+
+
+def _translation_batches(texts):
+    batch = []
+    char_count = 0
+
+    for text in texts:
+        if batch and (
+            len(batch) >= TRANSLATION_BATCH_ITEMS
+            or char_count + len(text) > TRANSLATION_BATCH_CHARS
+        ):
+            yield batch
+            batch = []
+            char_count = 0
+
+        batch.append(text)
+        char_count += len(text)
+
+    if batch:
+        yield batch
+
+
+def _request_translation_batch(texts, target_language):
+    params = [
+        ("client", "dict-chrome-ex"),
+        ("sl", "auto"),
+        ("tl", target_language),
+    ]
+    params.extend(("q", text) for text in texts)
+
+    response = requests.get(
+        GOOGLE_TRANSLATE_URL,
+        params=params,
+        timeout=(5, 30),
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    response.raise_for_status()
+    payload = response.json()
+
+    if not isinstance(payload, list) or len(payload) != len(texts):
+        raise TranslationError("翻译服务返回了不完整的数据")
+
+    translated = []
+    for item in payload:
+        if not isinstance(item, list) or not item or not isinstance(item[0], str):
+            raise TranslationError("翻译服务返回了无法识别的数据")
+        translated.append(item[0])
+
+    return translated
+
 async def translate_text_bulk(texts, target_language):
     """
-    使用 googletrans 批量翻译文本列表到目标语言.
+    分批调用 Google Chrome 翻译端点，避免 googletrans 在被限流时无限等待。
     在翻译前后都进行文本清洗，彻底移除多余的回车、转义字符和孤立的 'n'、'\\N'。
-
     """
-    translator = Translator()
     try:
         cleaned_texts = []
         for text in texts:
@@ -35,10 +93,24 @@ async def translate_text_bulk(texts, target_language):
             # print(f"原文片段 (清洗后): {cleaned_text}") # 打印清洗后的原文片段
             cleaned_texts.append(cleaned_text)
 
-        # 批量翻译清洗后的文本列表
-        translated_results = await translator.translate(cleaned_texts, dest=target_language)
-        # 提取翻译后的文本
-        translated_texts_pre_clean = [result.text for result in translated_results] # 翻译后的文本，先保存到临时列表
+        if not cleaned_texts:
+            return [], []
+
+        async def translate_all_batches():
+            results = []
+            for batch in _translation_batches(cleaned_texts):
+                translated_batch = await asyncio.to_thread(
+                    _request_translation_batch,
+                    batch,
+                    target_language,
+                )
+                results.extend(translated_batch)
+            return results
+
+        translated_texts_pre_clean = await asyncio.wait_for(
+            translate_all_batches(),
+            timeout=TRANSLATION_TOTAL_TIMEOUT,
+        )
 
         translated_texts_post_clean = [] # 存储最终清洗后的翻译文本
         for text in translated_texts_pre_clean:
@@ -55,10 +127,15 @@ async def translate_text_bulk(texts, target_language):
 
         return translated_texts_post_clean, cleaned_texts # 返回最终清洗后的翻译文本
 
-    except Exception as e:
-        print(f"批量翻译错误: {e}")
-        # 如果翻译失败，返回原始文本列表，保证后续处理不中断
-        return texts
+    except asyncio.TimeoutError as exc:
+        logger.exception("翻译请求超过总时限")
+        raise TranslationError("翻译服务响应超时，请缩短字幕后重试") from exc
+    except TranslationError:
+        logger.exception("翻译服务返回异常")
+        raise
+    except (requests.RequestException, ValueError) as exc:
+        logger.exception("翻译接口请求失败")
+        raise TranslationError("翻译服务暂时不可用，请稍后重试") from exc
 
 async def subtitle_convert_and_download(subs, subtitle_format, custom_filename, target_language):
 
@@ -154,57 +231,85 @@ async def subtitle_convert_and_download(subs, subtitle_format, custom_filename, 
         # 如果没有自定义文件名，使用默认前缀加上 UUID
         response_filename = f"converted_{unique_id}.{subtitle_format}"
 
-    converted_file_path = f"/tmp/{response_filename}"
+    with tempfile.NamedTemporaryFile(
+        prefix='subchange-output-',
+        suffix=f'.{subtitle_format}',
+        delete=False,
+    ) as converted_file:
+        converted_file_path = converted_file.name
 
-    if subtitle_format == 'srt':
-        subs.save(converted_file_path, format='srt')
-    elif subtitle_format == 'ass':
-        subs.save(converted_file_path, format='ass')
-    elif subtitle_format == 'ssa':
-        subs.save(converted_file_path, format='ssa')
-    elif subtitle_format == 'vtt':
-        subs.save(converted_file_path, format='vtt')
-    elif subtitle_format == 'sub':
-        subs.save(converted_file_path, format='sub')
+    try:
+        subs.save(converted_file_path, format=subtitle_format)
+        with open(converted_file_path, 'rb') as f:
+            converted_subtitle = f.read()
 
-    with open(converted_file_path, 'rb') as f:
-        converted_subtitle = f.read()
-    # 准备下载文件
-    response = HttpResponse(converted_subtitle, content_type='text/plain') 
-
-    # 对文件名进行 URL 编码
-    encoded_filename = quote(response_filename.encode('utf-8'))
-
-    # 设置 Content-Disposition 头
-    response['Content-Disposition'] = (f'attachment; filename="{encoded_filename}";'f'filename*=UTF-8\'\'{encoded_filename}')   
-   
-
-
-    # 使用 quote() 对文件名进行 URL 编码
-    # response['Content-Disposition'] = f'attachment; filename="{quote(response_filename)}"'
-    # 下载准备日志记录 
-    logger.info(f"字幕文件 '{response_filename}' 译成 '{target_language}' 以 '{subtitle_format}' 格式转换成功，准备提供下载。")
-    os.remove(converted_file_path)
-    return response
+        response = HttpResponse(converted_subtitle, content_type='text/plain')
+        encoded_filename = quote(response_filename.encode('utf-8'))
+        response['Content-Disposition'] = (
+            f'attachment; filename="{encoded_filename}";'
+            f"filename*=UTF-8''{encoded_filename}"
+        )
+        logger.info(
+            "字幕文件 '%s' 译成 '%s' 以 '%s' 格式转换成功，准备提供下载。",
+            response_filename,
+            target_language,
+            subtitle_format,
+        )
+        return response
+    finally:
+        if os.path.exists(converted_file_path):
+            os.remove(converted_file_path)
 
 
 async def subtitle_convert(request):
-    if request.method == 'POST' and request.FILES['subtitle']:
-        subtitle_file = request.FILES['subtitle']
-        subtitle_format = request.POST['format']
-        target_language = request.POST['target_language']
+    if request.method == 'POST':
+        subtitle_file = request.FILES.get('subtitle')
+        if not subtitle_file:
+            return HttpResponse("请选择字幕文件", status=400)
+        if subtitle_file.size > MAX_UPLOAD_SIZE:
+            return HttpResponse("字幕文件不能超过 5 MB", status=413)
+
+        source_extension = os.path.splitext(subtitle_file.name)[1].lower()
+        if source_extension not in SUPPORTED_EXTENSIONS:
+            return HttpResponse("不支持的字幕文件类型", status=400)
+
+        subtitle_format = request.POST.get('format', 'srt')
+        target_language = request.POST.get('target_language', 'none')
+        if subtitle_format not in {'srt', 'ass', 'ssa', 'vtt', 'sub'}:
+            return HttpResponse("不支持的输出格式", status=400)
+        if target_language not in SUPPORTED_TARGET_LANGUAGES:
+            return HttpResponse("不支持的目标语言", status=400)
+
         custom_filename = request.POST.get('custom_filename', 'converted')
         if not custom_filename:
             custom_filename = os.path.splitext(subtitle_file.name)[0]
+        custom_filename = os.path.basename(custom_filename.strip())
+        custom_filename = re.sub(r'[^\w.-]+', '_', custom_filename)[:100] or 'converted'
 
-        temp_path = default_storage.save(subtitle_file.name, ContentFile(subtitle_file.read()))
-        subs = pysubs2.load(temp_path)
+        with tempfile.NamedTemporaryFile(
+            prefix='subchange-upload-',
+            suffix=source_extension,
+            delete=False,
+        ) as uploaded_file:
+            for chunk in subtitle_file.chunks():
+                uploaded_file.write(chunk)
+            temp_path = uploaded_file.name
 
-        response = await subtitle_convert_and_download(subs, subtitle_format, custom_filename, target_language)
-
-        # response = await subtitle_convert_and_download(subs, subtitle_format, f"{custom_filename}.{subtitle_format}", target_language)
-
-        default_storage.delete(temp_path)
-        return response
+        try:
+            subs = pysubs2.load(temp_path)
+            return await subtitle_convert_and_download(
+                subs,
+                subtitle_format,
+                custom_filename,
+                target_language,
+            )
+        except TranslationError as exc:
+            return HttpResponse(f"翻译失败：{exc}", status=502)
+        except Exception:
+            logger.exception("字幕转换失败")
+            return HttpResponse("字幕文件无法处理，请检查文件格式后重试", status=400)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     return render(request, 'converter/upload.html')

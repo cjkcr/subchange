@@ -5,10 +5,21 @@ __pycache__/
 
 # Virtual Environment
 env/
+venv/
+.venv/
 
 # Django stuff
 *.log
 db.sqlite3
+staticfiles/
+media/
+
+# Local secrets
+.env
+*.env
+
+# macOS
+.DS_Store
 
 # VSCode settings
 .vscode/
