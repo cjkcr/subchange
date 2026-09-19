@@ -12,7 +12,7 @@ Subchange is a lightweight Django web service for converting and translating sub
 
 - Convert between SRT, ASS, SSA, VTT, and SUB.
 - Translate subtitles into Chinese, English, Spanish, or French.
-- Generate bilingual output containing the translation and original text.
+- Choose translation-only output or bilingual output containing both the translation and original text.
 - Preserve common timing, bracketed text, and italic subtitle structures.
 - Remove temporary upload and output files after each response.
 - Enforce a 5 MB upload limit.

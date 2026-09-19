@@ -19,6 +19,7 @@ TRANSLATION_TOTAL_TIMEOUT = 240
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {'.srt', '.ass', '.ssa', '.vtt', '.sub'}
 SUPPORTED_TARGET_LANGUAGES = {'none', 'en', 'zh-cn', 'es', 'fr'}
+SUPPORTED_TRANSLATION_MODES = {'bilingual', 'translated'}
 
 
 class TranslationError(Exception):
@@ -137,7 +138,13 @@ async def translate_text_bulk(texts, target_language):
         logger.exception("翻译接口请求失败")
         raise TranslationError("翻译服务暂时不可用，请稍后重试") from exc
 
-async def subtitle_convert_and_download(subs, subtitle_format, custom_filename, target_language):
+async def subtitle_convert_and_download(
+    subs,
+    subtitle_format,
+    custom_filename,
+    target_language,
+    translation_mode='bilingual',
+):
 
     
     """
@@ -146,6 +153,7 @@ async def subtitle_convert_and_download(subs, subtitle_format, custom_filename, 
     :param subtitle_format: 用户选择的输出格式 (srt, ass, ssa, vtt, sub)
     :param response_filename: 转换后的字幕文件名
     :param target_language: 用户选择的目标语言（如 'en'，'zh' 等）
+    :param translation_mode: bilingual 为译文加原文，translated 为仅保留译文
     :return: HttpResponse 对象，包含转换后的文件内容
     """
     if target_language != 'none':
@@ -217,8 +225,11 @@ async def subtitle_convert_and_download(subs, subtitle_format, custom_filename, 
             translated_text_line = "".join(translated_line_parts)
             cleaned_text_line = "".join(cleaned_text_part)
             
-            # 构建双语字幕行：原始文本 + 换行符 + 翻译文本
-            line.text = translated_text_line + "\n" + cleaned_text_line
+            if translation_mode == 'translated':
+                line.text = translated_text_line
+            else:
+                # 构建双语字幕行：译文 + 换行符 + 原文
+                line.text = translated_text_line + "\n" + cleaned_text_line
             # print(f"双语字幕行: {line.text}") # 打印双语字幕行
 
     # 后续处理 (保存文件和返回 response) 与之前代码相同
@@ -275,10 +286,13 @@ async def subtitle_convert(request):
 
         subtitle_format = request.POST.get('format', 'srt')
         target_language = request.POST.get('target_language', 'none')
+        translation_mode = request.POST.get('translation_mode', 'bilingual')
         if subtitle_format not in {'srt', 'ass', 'ssa', 'vtt', 'sub'}:
             return HttpResponse("不支持的输出格式", status=400)
         if target_language not in SUPPORTED_TARGET_LANGUAGES:
             return HttpResponse("不支持的目标语言", status=400)
+        if translation_mode not in SUPPORTED_TRANSLATION_MODES:
+            return HttpResponse("不支持的翻译输出模式", status=400)
 
         custom_filename = request.POST.get('custom_filename', 'converted')
         if not custom_filename:
@@ -302,6 +316,7 @@ async def subtitle_convert(request):
                 subtitle_format,
                 custom_filename,
                 target_language,
+                translation_mode,
             )
         except TranslationError as exc:
             return HttpResponse(f"翻译失败：{exc}", status=502)

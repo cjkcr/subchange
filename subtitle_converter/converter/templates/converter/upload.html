@@ -209,8 +209,15 @@
                 <option value="fr">French</option>
                 <!-- 其他语言可以按需添加 -->
             </select>
-            <p><em>Only supports translation of STR format files.</em><br>
-                <em>Can only generate dual-language subtitles.</em>
+            <div id="translation-output-options" hidden>
+                <label for="translation_mode">Translation Output:</label>
+                <select name="translation_mode" id="translation_mode">
+                    <option value="bilingual">Bilingual (Translation + Original)</option>
+                    <option value="translated">Translation Only</option>
+                </select>
+            </div>
+            <p><em>Only supports translation of SRT format files.</em><br>
+                <em>Choose bilingual or translation-only output.</em>
             </p><br>
 
             <label for="format">Convert to:</label>
@@ -340,6 +347,22 @@
         });
     </script> -->
     <script>
+        const targetLanguageSelect = document.getElementById('target_language');
+        const translationOutputOptions = document.getElementById('translation-output-options');
+        const translationModeSelect = document.getElementById('translation_mode');
+
+        function updateTranslationOutputOptions() {
+            const translationEnabled = targetLanguageSelect.value !== 'none';
+            translationOutputOptions.hidden = !translationEnabled;
+            translationModeSelect.disabled = !translationEnabled;
+        }
+
+        targetLanguageSelect.addEventListener('change', updateTranslationOutputOptions);
+        document.getElementById('convert-form').addEventListener('reset', function () {
+            setTimeout(updateTranslationOutputOptions, 0);
+        });
+        updateTranslationOutputOptions();
+
         document.getElementById('convert-form').addEventListener('submit', function (e) {
             e.preventDefault();
 
