@@ -208,9 +208,9 @@
         .process-status, .download-status { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line-strong); }
         .process-line {
             display: grid;
-            grid-template-columns: repeat(40, minmax(1px, 1fr));
+            grid-template-columns: repeat(72, minmax(1px, 1fr));
             align-items: end;
-            gap: 4px;
+            gap: 2px;
             height: 16px;
         }
         .process-line i {
@@ -425,7 +425,7 @@
         const statusMessage = document.getElementById('status-message');
         const progressPercent = document.getElementById('progress-percent');
         const progressTrack = document.getElementById('progress-track');
-        const PROGRESS_TICK_COUNT = 40;
+        const PROGRESS_TICK_COUNT = 72;
         const progressTicks = Array.from({ length: PROGRESS_TICK_COUNT }, () => {
             const tick = document.createElement('i');
             tick.setAttribute('aria-hidden', 'true');
