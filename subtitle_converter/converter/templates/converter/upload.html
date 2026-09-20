@@ -214,13 +214,14 @@
             height: 12px;
         }
         .process-line i {
+            justify-self: center;
             width: 1px;
             height: 10px;
             background: var(--line-strong);
             opacity: 0.4;
-            transition: background-color 90ms linear, opacity 90ms linear;
+            transition: width 90ms linear, background-color 90ms linear, opacity 90ms linear;
         }
-        .process-line i.is-active { background: var(--ink); opacity: 1; }
+        .process-line i.is-active { width: 2px; background: var(--ink); opacity: 1; }
         .status-copy { display: flex; justify-content: space-between; gap: 1rem; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
         .status-copy strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .download-link { margin-top: 0.75rem; background: transparent; color: var(--ink); }
