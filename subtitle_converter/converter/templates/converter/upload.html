@@ -1,434 +1,485 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subtitle Format Converter</title>
+    <meta name="description" content="Convert and translate SRT, ASS, SSA, and VTT subtitle files.">
+    <title>Subchange — Subtitle Converter</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'converter/favicon.svg' %}">
     <style>
-        /* 外部进度条容器 */
-        #translating-container {
-            position: relative;
-            width: 100%;
-            height: 30px;
-            background-color: #ddd;
-            border-radius: 12px;
-            overflow: hidden;
-            display: none;
-            /* 隐藏容器 */
-            margin-top: 30px;
+        :root {
+            --paper: #f3f1ea;
+            --paper-deep: #e7e3d9;
+            --ink: #1c1c1c;
+            --muted: #6b6963;
+            --line: rgba(28, 28, 28, 0.22);
+            --line-strong: rgba(28, 28, 28, 0.72);
+            --serif: "Iowan Old Style", "Baskerville", "Times New Roman", serif;
+            --sans: "Helvetica Neue", "Neue Haas Grotesk Text Pro", Arial, sans-serif;
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* 内部进度条 */
-        #translating-indicator {
-            display: inline-block;
-            height: 100%;
-            width: 0%;
-            /* 初始宽度 */
-            background: linear-gradient(to right, #ff7e5f, #feb47b);
-            border-radius: 12px 0 0 12px;
-            text-align: center;
-            line-height: 30px;
-            color: white;
-            font-weight: bold;
-            animation: progress-animation 20s linear infinite;
-            /* 设置动画 */
+        * { box-sizing: border-box; }
+        html { background: var(--paper); color: var(--ink); scroll-behavior: smooth; }
+        body { margin: 0; background: var(--paper); font-family: var(--sans); }
+        button, input, select { font: inherit; }
+        a { color: inherit; text-underline-offset: 0.2em; }
+        [hidden] { display: none !important; }
+
+        .skip-link {
+            position: fixed;
+            left: 1rem;
+            top: 1rem;
+            z-index: 20;
+            padding: 0.8rem 1rem;
+            background: var(--ink);
+            color: var(--paper);
+            transform: translateY(-180%);
         }
+        .skip-link:focus { transform: translateY(0); }
 
-        /* 动画设置：进度条宽度更新 */
-        @keyframes progress-animation {
-            0% {
-                width: 0%;
-            }
-
-            100% {
-                width: 100%;
-            }
+        .page-shell { width: min(100% - 3rem, 1440px); margin: 0 auto; }
+        .masthead {
+            min-height: 74px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            border-bottom: 1px solid var(--line-strong);
+            font-size: 0.7rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
         }
+        .brand { font-family: var(--serif); font-size: 1.15rem; letter-spacing: -0.02em; text-transform: none; }
+        .masthead__center { color: var(--muted); }
+        .masthead__right { justify-self: end; }
+        .masthead a { text-decoration-thickness: 1px; }
 
-        /* 内部进度条文本 */
-        #translating-indicator::after {
-            content: '正在翻译中...';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 16px;
-            font-style: italic;
-            color: white;
-            font-weight: bold;
-            animation: text-animation 60s linear infinite;
+        .hero {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 1.5rem;
+            padding: clamp(4rem, 9vw, 9rem) 0 clamp(4.5rem, 8vw, 8rem);
         }
-
-        /* 动画设置：更新文本 */
-        @keyframes text-animation {
-            0% {
-                content: 'Translation in progress...';
-            }
-
-            30% {
-                content: 'Translation in progress';
-            }
-
-            60% {
-                content: 'wait a minute......';
-            }
-
-            80% {
-                content: 'Still waiting......';
-            }
-
-            100% {
-                content: 'Waiting... a long wait......';
-            }
+        .hero__title { grid-column: 1 / 10; margin: 0; }
+        .eyebrow, .section-label, .field label, .figure-label, .micro-label {
+            display: block;
+            margin: 0 0 1rem;
+            color: var(--muted);
+            font-size: 0.67rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            line-height: 1.3;
+            text-transform: uppercase;
         }
-
-        body {
+        h1 {
             margin: 0;
-            padding: 0;
-            background-color: #ADD8E6;
-            font-family: Arial, sans-serif;
+            max-width: 10ch;
+            font-family: var(--serif);
+            font-size: clamp(4.4rem, 11vw, 10rem);
+            font-weight: 400;
+            letter-spacing: -0.075em;
+            line-height: 0.79;
         }
-
-        .container {
-            width: 50%;
-            margin: 0 auto;
-            padding: 20px;
-            padding-bottom: 50px;
-            background-color: #ffFFEFC8;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            margin-top: 50px;
+        h1 em { font-weight: 400; }
+        .hero__deck {
+            grid-column: 9 / 13;
+            align-self: end;
+            margin: 2rem 0 0;
+            padding: 0 0 0 1.5rem;
+            border-left: 1px solid var(--line-strong);
         }
+        .hero__deck p { max-width: 34rem; margin: 0; font-family: var(--serif); font-size: clamp(1.2rem, 2vw, 1.65rem); line-height: 1.35; }
+        .hero__deck small { display: block; margin-top: 2rem; color: var(--muted); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; }
 
-        P {
-            font-size: 14px;
-            margin-top: 0px;
-            margin-bottom: 5px;
-            opacity: 0.6;
+        .workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+            border-top: 1px solid var(--line-strong);
+            border-bottom: 1px solid var(--line-strong);
         }
-
-        footer {
-            width: 50%;
-            margin: 0 auto;
-            padding: 20px;
-            padding-bottom: 50px;
-            /* background-color: #ffFFEFC8; */
-            border-radius: 5px;
-            /* box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); */
-            text-align: left;
-            margin-top: 0px;
-            opacity: 0.4;
-            font-size: 16px;
+        .editorial-figure {
+            position: relative;
+            min-height: 720px;
+            margin: 0;
+            overflow: hidden;
+            background: var(--ink);
+            color: var(--paper);
         }
-
-
-        h4 {
-            text-align: center;
-            margin-bottom: 20px;
+        .editorial-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+        .figure-label { position: absolute; top: 2rem; left: 2rem; z-index: 1; color: rgba(243, 241, 234, 0.64); }
+        .figure-caption {
+            position: absolute;
+            right: 2rem;
+            bottom: 2rem;
+            left: 2rem;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: end;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(243, 241, 234, 0.42);
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            line-height: 1.5;
+            text-transform: uppercase;
         }
+        .figure-caption span:last-child { font-family: var(--serif); font-size: 2rem; letter-spacing: -0.04em; text-transform: none; }
 
-        form {
-            display: flex;
-            flex-direction: column;
+        .converter-panel { padding: clamp(2.25rem, 5vw, 5.5rem); background: var(--paper); }
+        .converter-panel h2 {
+            margin: 0 0 1.25rem;
+            max-width: 12ch;
+            font-family: var(--serif);
+            font-size: clamp(2.7rem, 5vw, 5.25rem);
+            font-weight: 400;
+            letter-spacing: -0.055em;
+            line-height: 0.95;
         }
-
-        label {
-            margin-bottom: 5px;
+        .intro { max-width: 58ch; margin: 0 0 3.5rem; color: var(--muted); font-size: 0.95rem; line-height: 1.65; }
+        .converter-form { display: grid; gap: 1.6rem; }
+        .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+        .field--wide { grid-column: 1 / -1; }
+        .field label { margin-bottom: 0.55rem; color: var(--ink); }
+        .field-help { display: block; margin-top: 0.55rem; color: var(--muted); font-size: 0.72rem; line-height: 1.45; }
+        .field input[type="text"], .field select {
+            width: 100%;
+            min-height: 48px;
+            padding: 0.65rem 2.25rem 0.65rem 0;
+            border: 0;
+            border-bottom: 1px solid var(--line-strong);
+            border-radius: 0;
+            outline: 0;
+            background: transparent;
+            color: var(--ink);
         }
-
-
-        input[type="file"] {
-            margin-bottom: 10px;
+        .field input[type="file"] {
+            width: 100%;
+            min-height: 58px;
+            padding: 0.45rem;
+            border: 1px solid var(--line-strong);
+            border-radius: 0;
+            background: transparent;
+            color: var(--muted);
         }
-
-        select {
-            margin-bottom: 10px;
-            height: 30px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-
-        }
-
-        input[type="text"] {
-            margin-bottom: 10px;
-            height: 25px;
-            padding: 5px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-
-        }
-
-        button {
-            padding: 10px;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
+        .field input[type="file"]::file-selector-button {
+            min-height: 44px;
+            margin-right: 1rem;
+            padding: 0 1rem;
+            border: 0;
+            border-right: 1px solid var(--line-strong);
+            background: transparent;
+            color: var(--ink);
             cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
         }
-
-        button:hover {
-            background-color: #0056b3;
+        .field input:focus-visible, .field select:focus-visible, .submit-button:focus-visible, .download-link:focus-visible, a:focus-visible {
+            outline: 2px solid var(--ink);
+            outline-offset: 4px;
         }
-
-        #download-link-container {
-            height: 28px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
-            width: auto;
-            padding-top: 10px;
-            padding-left: 10px;
-            background-color: #ADD8E6;
+        .form-rule { margin: 0; border: 0; border-top: 1px solid var(--line); }
+        .submit-row { display: grid; grid-template-columns: 1fr auto; gap: 1.5rem; align-items: center; }
+        .submit-note { margin: 0; max-width: 32ch; color: var(--muted); font-size: 0.73rem; line-height: 1.5; }
+        .submit-button, .download-link {
+            min-height: 52px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.8rem 1.35rem;
+            border: 1px solid var(--ink);
+            border-radius: 0;
+            background: var(--ink);
+            color: var(--paper);
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: background 180ms ease, color 180ms ease;
         }
+        .submit-button:hover, .download-link:hover { background: transparent; color: var(--ink); }
+        .submit-button:disabled { cursor: wait; opacity: 0.55; }
 
-        #download-link {
-            color: goldenrod;
-            /* 设置下载链接的颜色为金色 */
+        .process-status, .download-status { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line-strong); }
+        .process-line { height: 3px; overflow: hidden; background: var(--paper-deep); }
+        .process-line span { display: block; width: 34%; height: 100%; background: var(--ink); animation: scan 1.4s var(--ease) infinite; }
+        .status-copy { margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .download-link { margin-top: 0.75rem; background: transparent; color: var(--ink); }
+        .download-link:hover { background: var(--ink); color: var(--paper); }
+
+        .index-strip {
+            display: grid;
+            grid-template-columns: 2fr repeat(4, 1fr);
+            border-bottom: 1px solid var(--line-strong);
+        }
+        .index-strip > * { min-height: 132px; padding: 1.35rem; border-right: 1px solid var(--line); }
+        .index-strip > *:last-child { border-right: 0; }
+        .index-intro { display: flex; flex-direction: column; justify-content: space-between; }
+        .index-intro p { max-width: 30ch; margin: 0; font-family: var(--serif); font-size: 1.2rem; line-height: 1.3; }
+        .format-mark { display: flex; flex-direction: column; justify-content: space-between; }
+        .format-mark strong { font-family: var(--serif); font-size: clamp(2rem, 3vw, 3.8rem); font-weight: 400; letter-spacing: -0.06em; }
+        .format-mark small { color: var(--muted); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; }
+
+        .footer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            padding: 2rem 0 3.5rem;
+            color: var(--muted);
+            font-size: 0.72rem;
+            line-height: 1.6;
+        }
+        .footer p { margin: 0; }
+        .footer p:last-child { justify-self: end; text-align: right; }
+
+        @keyframes scan { from { transform: translateX(-110%); } to { transform: translateX(300%); } }
+        @media (max-width: 900px) {
+            .page-shell { width: min(100% - 2rem, 1440px); }
+            .masthead { grid-template-columns: 1fr auto; }
+            .masthead__center { display: none; }
+            .hero { display: block; }
+            .hero__deck { max-width: 38rem; margin: 3rem 0 0 auto; }
+            .workspace { grid-template-columns: 1fr; }
+            .editorial-figure { min-height: 500px; }
+            .index-strip { grid-template-columns: repeat(4, 1fr); }
+            .index-intro { grid-column: 1 / -1; min-height: 150px; border-right: 0; border-bottom: 1px solid var(--line-strong); }
+        }
+        @media (max-width: 560px) {
+            .page-shell { width: min(100% - 1.25rem, 1440px); }
+            .masthead__right { font-size: 0; }
+            .masthead__right::after { content: "LIVE"; font-size: 0.68rem; }
+            .hero { padding: 3.5rem 0 4rem; }
+            .eyebrow { max-width: 100%; font-size: 0.58rem; letter-spacing: 0.14em; line-height: 1.65; overflow-wrap: anywhere; }
+            h1 { max-width: 100%; font-size: clamp(3.25rem, 15vw, 4.7rem); letter-spacing: -0.065em; }
+            .hero__deck { margin-top: 2.5rem; }
+            .editorial-figure { min-height: 410px; }
+            .converter-panel { padding: 2.5rem 1rem; }
+            .field-grid, .submit-row { grid-template-columns: 1fr; }
+            .submit-button { width: 100%; }
+            .index-strip { grid-template-columns: repeat(2, 1fr); }
+            .index-strip > *:nth-child(3) { border-right: 0; }
+            .index-strip > *:nth-child(2), .index-strip > *:nth-child(3) { border-bottom: 1px solid var(--line); }
+            .footer { grid-template-columns: 1fr; }
+            .footer p:last-child { justify-self: start; text-align: left; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        <h4>Subtitle format conversion and translation</h4>
-        <form id="convert-form" method="POST" enctype="multipart/form-data">
-            {% csrf_token %}
-            <label for="subtitle">Upload Subtitle:</label>
-            <input type="file" name="subtitle" accept=".srt,.ass,.ssa,.vtt" required><br>
+    <a class="skip-link" href="#converter">Skip to converter</a>
+    <div class="page-shell">
+        <header class="masthead">
+            <div class="brand">Subchange</div>
+            <div class="masthead__center">Issue 01 / Subtitle Tools</div>
+            <div class="masthead__right"><a href="https://github.com/cjkcr/subchange">Open source on GitHub</a></div>
+        </header>
 
-            <!-- 选择目标语言的下拉菜单 -->
-            <label for="target_language">Choose Target Language:</label>
-            <select name="target_language" id="target_language">
-                <option value="none">No Translation</option>
-                <option value="en">English</option>
-                <option value="zh-cn">Chinese</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <!-- 其他语言可以按需添加 -->
-            </select>
-            <div id="translation-output-options" hidden>
-                <label for="translation_mode">Translation Output:</label>
-                <select name="translation_mode" id="translation_mode">
-                    <option value="bilingual">Bilingual (Translation + Original)</option>
-                    <option value="translated">Translation Only</option>
-                </select>
-            </div>
-            <p><em>Translation supports SRT, ASS, SSA, and VTT files.</em><br>
-                <em>Choose bilingual or translation-only output.</em>
-            </p><br>
+        <main>
+            <section class="hero" aria-labelledby="page-title">
+                <div class="hero__title">
+                    <span class="eyebrow">Format conversion · Translation · Bilingual output</span>
+                    <h1 id="page-title">Subtitles,<br><em>reconsidered.</em></h1>
+                </div>
+                <div class="hero__deck">
+                    <p>A precise workspace for moving subtitles between formats—and languages—without adding noise to the process.</p>
+                    <small>SRT / ASS / SSA / VTT · Up to 5 MB</small>
+                </div>
+            </section>
 
-            <label for="format">Convert to:</label>
-            <select name="format" required>
-                <option value="srt">SRT</option>
-                <option value="ass">ASS</option>
-                <option value="ssa">SSA</option>
-                <option value="vtt">VTT</option>
-            </select><br><br>
+            <section class="workspace" id="converter" aria-labelledby="converter-title">
+                <figure class="editorial-figure">
+                    <span class="figure-label">Fig. 01 — Speech / Time</span>
+                    <svg viewBox="0 0 600 780" role="img" aria-labelledby="visual-title visual-desc" preserveAspectRatio="xMidYMid slice">
+                        <title id="visual-title">Abstract subtitle timeline</title>
+                        <desc id="visual-desc">An editorial composition of timing lines, subtitle frames, and typographic marks.</desc>
+                        <rect width="600" height="780" fill="#1c1c1c"/>
+                        <g fill="none" stroke="#f3f1ea" stroke-opacity="0.28">
+                            <path d="M48 116H552M48 196H552M48 276H552M48 356H552M48 436H552M48 516H552M48 596H552"/>
+                            <path d="M112 70V650M300 70V650M488 70V650"/>
+                        </g>
+                        <g fill="#f3f1ea">
+                            <text x="54" y="172" font-family="Georgia, serif" font-size="98" letter-spacing="-8">01</text>
+                            <rect x="170" y="216" width="306" height="8"/>
+                            <rect x="214" y="246" width="238" height="8" opacity="0.58"/>
+                            <text x="52" y="414" font-family="Arial, sans-serif" font-size="14" letter-spacing="4">00:01:24,080</text>
+                            <text x="52" y="470" font-family="Georgia, serif" font-size="36">Meaning survives</text>
+                            <text x="178" y="514" font-family="Georgia, serif" font-size="36" font-style="italic">the format.</text>
+                        </g>
+                        <g fill="none" stroke="#f3f1ea" stroke-width="2">
+                            <path d="M54 570c38-52 74 52 112 0s74 52 112 0 74 52 112 0 74 52 112 0"/>
+                        </g>
+                    </svg>
+                    <figcaption class="figure-caption"><span>One timeline.<br>Four formats.</span><span>A/01</span></figcaption>
+                </figure>
 
-            <!-- 自定义文件名 -->
-            <label for="custom_filename">Custom Filename (Optional):</label>
-            <input type="text" name="custom_filename" placeholder="converted"><br><br>
+                <div class="converter-panel">
+                    <span class="section-label">The work desk</span>
+                    <h2 id="converter-title">Convert with intent.</h2>
+                    <p class="intro">Upload a subtitle, choose a language and output format, then download the result. Translation can preserve the original line or return the translated line alone.</p>
 
-            <button type="submit">Convert & Download</button>
-        </form>
-        <div id="translating-container" style="display:none; margin-top: 30px;">
-            <span id="translating-indicator"></span>
-        </div>
-        <div id="download-link-container" style="display:none; margin-top: 30px;">
-            <a id="download-link" href="#">下载已转换的字幕</a>
-        </div>
+                    <form class="converter-form" id="convert-form" method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="field field--wide">
+                            <label for="subtitle">01 / Source file</label>
+                            <input id="subtitle" type="file" name="subtitle" accept=".srt,.ass,.ssa,.vtt" required>
+                            <span class="field-help">Accepted: SRT, ASS, SSA, VTT · Maximum file size: 5 MB</span>
+                        </div>
 
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="target_language">02 / Target language</label>
+                                <select name="target_language" id="target_language">
+                                    <option value="none">No translation</option>
+                                    <option value="en">English</option>
+                                    <option value="zh-cn">Chinese</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                </select>
+                            </div>
+                            <div class="field" id="translation-output-options" hidden>
+                                <label for="translation_mode">03 / Translation output</label>
+                                <select name="translation_mode" id="translation_mode">
+                                    <option value="bilingual">Translation + original</option>
+                                    <option value="translated">Translation only</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="format">04 / Output format</label>
+                                <select name="format" id="format" required>
+                                    <option value="srt">SRT</option>
+                                    <option value="ass">ASS</option>
+                                    <option value="ssa">SSA</option>
+                                    <option value="vtt">VTT</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="custom_filename">05 / File name</label>
+                                <input id="custom_filename" type="text" name="custom_filename" placeholder="converted" maxlength="100">
+                            </div>
+                        </div>
 
+                        <hr class="form-rule">
+                        <div class="submit-row">
+                            <p class="submit-note">Files are processed temporarily and removed after the response completes.</p>
+                            <button class="submit-button" id="submit-button" type="submit">Convert &amp; download</button>
+                        </div>
+                    </form>
 
+                    <div class="process-status" id="translating-container" role="status" aria-live="polite" hidden>
+                        <div class="process-line" aria-hidden="true"><span></span></div>
+                        <p class="status-copy" id="status-copy">Processing subtitle…</p>
+                    </div>
+                    <div class="download-status" id="download-link-container" role="status" aria-live="polite" hidden>
+                        <span class="micro-label">Your file is ready</span>
+                        <a class="download-link" id="download-link" href="#">Download converted subtitle</a>
+                    </div>
+                </div>
+            </section>
+
+            <section class="index-strip" aria-label="Supported formats">
+                <div class="index-intro"><span class="section-label">Format index</span><p>Translation and conversion across the formats that matter.</p></div>
+                <div class="format-mark"><strong>SRT</strong><small>SubRip</small></div>
+                <div class="format-mark"><strong>ASS</strong><small>Advanced</small></div>
+                <div class="format-mark"><strong>SSA</strong><small>SubStation</small></div>
+                <div class="format-mark"><strong>VTT</strong><small>Web video</small></div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Subchange / A focused subtitle utility powered by Django and open-source software.</p>
+            <p><a href="https://github.com/cjkcr/subchange">Source on GitHub</a><br>Uploads are not stored permanently.</p>
+        </footer>
     </div>
-    <footer>
-        <p><em>file would NOT be uploaded to anywhere.</em> </p>
-        <p><em>Powered by <a href="https://www.djangoproject.com/" title="The Python Programming Language">Django</a>
-                and a set of lovely open-source projects.</em></p>
-        <p><em>Source code is avaiable on
-                <a href="https://github.com/cjkcr/subchange">GitHub</a>.</em></p>
-    </footer>
-    <!-- <script>
-        // 监听表单提交
-        document.getElementById('convert-form').onsubmit = function (e) {
-            e.preventDefault(); // 防止表单默认提交
 
-            // 使用FormData将表单数据提交给后端
-            var formData = new FormData(this);
-
-            // 提交表单
-            fetch('/converter/', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => {
-                    // 获取文件名
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
-                    const fileName = fileNameMatch ? fileNameMatch[1] : 'converted_subtitle.srt';  // 默认文件名
-
-                    // 获取文件内容
-                    return response.blob().then(blob => ({ blob, fileName }));
-                })
-                .then(({ blob, fileName }) => {
-                    // 创建下载链接
-                    const link = document.createElement('a');
-                    const url = URL.createObjectURL(blob);
-                    link.href = url;
-                    link.download = fileName;  // 使用从响应中提取的文件名
-                    link.click();  // 触发下载
-
-                    // 等待 3 秒后刷新页面
-                    setTimeout(function () {
-                        location.reload();  // 3秒后刷新页面
-                    }, 3000);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
-        };
-    </script> -->
-    <!-- <script>
-        document.getElementById('convert-form').addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            const form = this;
-            const formData = new FormData(form);
-
-            const translatingContainer = document.getElementById('translating-container');
-            const downloadLinkContainer = document.getElementById('download-link-container');
-            const downloadLink = document.getElementById('download-link');
-
-            translatingContainer.style.display = 'block';
-            downloadLinkContainer.style.display = 'none';
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', form.action);
-            xhr.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
-
-
-            xhr.onload = function () {
-                if (xhr.status === 200) {
-                    translatingContainer.style.display = 'none';
-                    downloadLinkContainer.style.display = 'block';
-
-                    const filename = xhr.getResponseHeader('Content-Disposition').split('filename=')[1].replace(/"/g, '');
-                    const blob = new Blob([xhr.response], { type: 'text/plain' });
-                    const url = window.URL.createObjectURL(blob);
-                    downloadLink.href = url;
-                    downloadLink.download = filename;
-                    downloadLink.textContent = '点击下载: ' + filename;
-
-                    // 添加点击下载链接后的延时重置功能
-                    downloadLink.addEventListener('click', function () {
-                        setTimeout(function () {
-                            downloadLinkContainer.style.display = 'none'; // 隐藏下载链接
-                            form.reset(); // 重置表单，包括文件选择
-                        }, 3000); // 3秒后执行
-                    });
-
-                } else {
-                    alert('转换失败，请重试。');
-                    translatingContainer.style.display = 'none';
-                }
-            };
-
-            xhr.onerror = function () {
-                alert('上传或转换过程中发生错误。');
-                translatingContainer.style.display = 'none';
-            };
-
-            xhr.responseType = 'blob';
-            xhr.send(formData);
-        });
-    </script> -->
     <script>
+        const form = document.getElementById('convert-form');
         const targetLanguageSelect = document.getElementById('target_language');
         const translationOutputOptions = document.getElementById('translation-output-options');
         const translationModeSelect = document.getElementById('translation_mode');
+        const translatingContainer = document.getElementById('translating-container');
+        const downloadLinkContainer = document.getElementById('download-link-container');
+        const downloadLink = document.getElementById('download-link');
+        const submitButton = document.getElementById('submit-button');
+        const statusCopy = document.getElementById('status-copy');
 
         function updateTranslationOutputOptions() {
-            const translationEnabled = targetLanguageSelect.value !== 'none';
-            translationOutputOptions.hidden = !translationEnabled;
-            translationModeSelect.disabled = !translationEnabled;
+            const enabled = targetLanguageSelect.value !== 'none';
+            translationOutputOptions.hidden = !enabled;
+            translationModeSelect.disabled = !enabled;
+        }
+
+        function filenameFromHeader(header) {
+            if (!header) return 'converted_subtitle.srt';
+            const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+            if (utf8Match) return decodeURIComponent(utf8Match[1]);
+            const basicMatch = header.match(/filename="([^"]+)"/i);
+            return basicMatch ? decodeURIComponent(basicMatch[1]) : 'converted_subtitle.srt';
         }
 
         targetLanguageSelect.addEventListener('change', updateTranslationOutputOptions);
-        document.getElementById('convert-form').addEventListener('reset', function () {
-            setTimeout(updateTranslationOutputOptions, 0);
-        });
+        form.addEventListener('reset', () => setTimeout(updateTranslationOutputOptions, 0));
         updateTranslationOutputOptions();
 
-        document.getElementById('convert-form').addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            const form = this;
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
             const formData = new FormData(form);
+            translatingContainer.hidden = false;
+            downloadLinkContainer.hidden = true;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Processing…';
+            statusCopy.textContent = targetLanguageSelect.value === 'none' ? 'Converting subtitle…' : 'Translating and converting subtitle…';
 
-            const translatingContainer = document.getElementById('translating-container');
-            const downloadLinkContainer = document.getElementById('download-link-container');
-            const downloadLink = document.getElementById('download-link');
+            const request = new XMLHttpRequest();
+            request.open('POST', form.action || window.location.pathname);
+            request.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
+            request.responseType = 'blob';
 
-            translatingContainer.style.display = 'block';
-            downloadLinkContainer.style.display = 'none';
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', form.action || '/converter/'); // 确保 action 有默认值
-            xhr.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
-
-            xhr.onload = function () {
-                if (xhr.status === 200) {
-                    translatingContainer.style.display = 'none';
-                    downloadLinkContainer.style.display = 'block';
-
-                    // 获取 Content-Disposition 头部
-                    const contentDisposition = xhr.getResponseHeader('Content-Disposition');
-                    let filename = 'converted_subtitle.srt'; // 默认文件名
-
-                    // 优先尝试提取 filename* 参数（支持 UTF-8 编码）
-                    const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
-                    if (filenameStarMatch && filenameStarMatch[1]) {
-                        filename = decodeURIComponent(filenameStarMatch[1]);
-                    } else {
-                        // 回退到 filename 参数
-                        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-                        if (filenameMatch && filenameMatch[1]) {
-                            filename = decodeURIComponent(filenameMatch[1]);
-                        }
-                    }
-
-                    // 创建 Blob 并设置下载链接
-                    const blob = new Blob([xhr.response], { type: 'text/plain' });
-                    const url = window.URL.createObjectURL(blob);
-                    downloadLink.href = url;
+            request.onload = async function () {
+                translatingContainer.hidden = true;
+                if (request.status === 200) {
+                    const filename = filenameFromHeader(request.getResponseHeader('Content-Disposition'));
+                    const objectUrl = URL.createObjectURL(request.response);
+                    downloadLink.href = objectUrl;
                     downloadLink.download = filename;
-                    downloadLink.textContent = '点击下载: ' + filename;
-
-                    // 添加点击下载链接后的延时重置功能
-                    downloadLink.addEventListener('click', function () {
-                        setTimeout(function () {
-                            downloadLinkContainer.style.display = 'none'; // 隐藏下载链接
-                            form.reset(); // 重置表单，包括文件选择
-                        }, 3000); // 3秒后执行
-                    });
+                    downloadLink.textContent = `Download ${filename}`;
+                    downloadLinkContainer.hidden = false;
+                    downloadLink.onclick = () => setTimeout(() => {
+                        URL.revokeObjectURL(objectUrl);
+                        form.reset();
+                        translatingContainer.hidden = true;
+                        downloadLinkContainer.hidden = true;
+                        downloadLink.href = '#';
+                        downloadLink.removeAttribute('download');
+                        downloadLink.textContent = 'Download converted subtitle';
+                        statusCopy.textContent = 'Processing subtitle…';
+                    }, 1500);
                 } else {
-                    alert('转换失败，请重试。');
-                    translatingContainer.style.display = 'none';
+                    const message = await request.response.text();
+                    statusCopy.textContent = message || 'The subtitle could not be processed. Please check the file and try again.';
+                    translatingContainer.hidden = false;
                 }
             };
 
-            xhr.onerror = function () {
-                alert('上传或转换过程中发生错误。');
-                translatingContainer.style.display = 'none';
+            request.onerror = function () {
+                statusCopy.textContent = 'The connection was interrupted. Please try again.';
+                translatingContainer.hidden = false;
             };
 
-            xhr.responseType = 'blob';
-            xhr.send(formData);
+            request.onloadend = function () {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Convert & download';
+            };
+
+            request.send(formData);
         });
     </script>
 </body>
-
 </html>
