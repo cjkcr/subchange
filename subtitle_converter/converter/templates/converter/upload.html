@@ -206,8 +206,22 @@
         .submit-button:disabled { cursor: wait; opacity: 0.55; }
 
         .process-status, .download-status { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line-strong); }
-        .process-line { height: 3px; overflow: hidden; background: var(--paper-deep); }
-        .process-line span { display: block; width: 0; height: 100%; background: var(--ink); transition: width 240ms var(--ease); }
+        .process-line {
+            display: grid;
+            grid-template-columns: repeat(40, minmax(1px, 1fr));
+            align-items: end;
+            gap: 4px;
+            height: 16px;
+        }
+        .process-line i {
+            justify-self: center;
+            width: 1px;
+            height: 7px;
+            background: var(--line-strong);
+            opacity: 0.65;
+            transition: height 180ms var(--ease), background 180ms ease, opacity 180ms ease;
+        }
+        .process-line i.is-active { height: 15px; background: var(--ink); opacity: 1; }
         .status-copy { display: flex; justify-content: space-between; gap: 1rem; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
         .status-copy strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .download-link { margin-top: 0.75rem; background: transparent; color: var(--ink); }
@@ -374,7 +388,7 @@
                     </form>
 
                     <div class="process-status" id="translating-container" role="status" aria-live="polite" hidden>
-                        <div class="process-line" id="progress-track" role="progressbar" aria-label="Conversion progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-bar"></span></div>
+                        <div class="process-line" id="progress-track" role="progressbar" aria-label="Conversion progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
                         <p class="status-copy"><span id="status-message">Preparing subtitle…</span><strong id="progress-percent">0%</strong></p>
                     </div>
                     <div class="download-status" id="download-link-container" role="status" aria-live="polite" hidden>
@@ -410,8 +424,14 @@
         const submitButton = document.getElementById('submit-button');
         const statusMessage = document.getElementById('status-message');
         const progressPercent = document.getElementById('progress-percent');
-        const progressBar = document.getElementById('progress-bar');
         const progressTrack = document.getElementById('progress-track');
+        const PROGRESS_TICK_COUNT = 40;
+        const progressTicks = Array.from({ length: PROGRESS_TICK_COUNT }, () => {
+            const tick = document.createElement('i');
+            tick.setAttribute('aria-hidden', 'true');
+            progressTrack.appendChild(tick);
+            return tick;
+        });
         let pollTimer = null;
 
         function updateTranslationOutputOptions() {
@@ -422,7 +442,10 @@
 
         function setProgress(value, message) {
             const percent = Math.max(0, Math.min(100, Math.round(value)));
-            progressBar.style.width = `${percent}%`;
+            const activeTickCount = Math.ceil((percent / 100) * PROGRESS_TICK_COUNT);
+            progressTicks.forEach((tick, index) => {
+                tick.classList.toggle('is-active', index < activeTickCount);
+            });
             progressPercent.textContent = `${percent}%`;
             progressTrack.setAttribute('aria-valuenow', percent);
             if (message) statusMessage.textContent = message;
