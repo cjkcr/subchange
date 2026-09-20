@@ -207,8 +207,9 @@
 
         .process-status, .download-status { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line-strong); }
         .process-line { height: 3px; overflow: hidden; background: var(--paper-deep); }
-        .process-line span { display: block; width: 34%; height: 100%; background: var(--ink); animation: scan 1.4s var(--ease) infinite; }
-        .status-copy { margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .process-line span { display: block; width: 0; height: 100%; background: var(--ink); transition: width 240ms var(--ease); }
+        .status-copy { display: flex; justify-content: space-between; gap: 1rem; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .status-copy strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .download-link { margin-top: 0.75rem; background: transparent; color: var(--ink); }
         .download-link:hover { background: var(--ink); color: var(--paper); }
 
@@ -237,7 +238,6 @@
         .footer p { margin: 0; }
         .footer p:last-child { justify-self: end; text-align: right; }
 
-        @keyframes scan { from { transform: translateX(-110%); } to { transform: translateX(300%); } }
         @media (max-width: 900px) {
             .page-shell { width: min(100% - 2rem, 1440px); }
             .masthead { grid-template-columns: 1fr auto; }
@@ -374,8 +374,8 @@
                     </form>
 
                     <div class="process-status" id="translating-container" role="status" aria-live="polite" hidden>
-                        <div class="process-line" aria-hidden="true"><span></span></div>
-                        <p class="status-copy" id="status-copy">Processing subtitle…</p>
+                        <div class="process-line" id="progress-track" role="progressbar" aria-label="Conversion progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-bar"></span></div>
+                        <p class="status-copy"><span id="status-message">Preparing subtitle…</span><strong id="progress-percent">0%</strong></p>
                     </div>
                     <div class="download-status" id="download-link-container" role="status" aria-live="polite" hidden>
                         <span class="micro-label">Your file is ready</span>
@@ -408,7 +408,11 @@
         const downloadLinkContainer = document.getElementById('download-link-container');
         const downloadLink = document.getElementById('download-link');
         const submitButton = document.getElementById('submit-button');
-        const statusCopy = document.getElementById('status-copy');
+        const statusMessage = document.getElementById('status-message');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressBar = document.getElementById('progress-bar');
+        const progressTrack = document.getElementById('progress-track');
+        let pollTimer = null;
 
         function updateTranslationOutputOptions() {
             const enabled = targetLanguageSelect.value !== 'none';
@@ -416,12 +420,60 @@
             translationModeSelect.disabled = !enabled;
         }
 
-        function filenameFromHeader(header) {
-            if (!header) return 'converted_subtitle.srt';
-            const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
-            if (utf8Match) return decodeURIComponent(utf8Match[1]);
-            const basicMatch = header.match(/filename="([^"]+)"/i);
-            return basicMatch ? decodeURIComponent(basicMatch[1]) : 'converted_subtitle.srt';
+        function setProgress(value, message) {
+            const percent = Math.max(0, Math.min(100, Math.round(value)));
+            progressBar.style.width = `${percent}%`;
+            progressPercent.textContent = `${percent}%`;
+            progressTrack.setAttribute('aria-valuenow', percent);
+            if (message) statusMessage.textContent = message;
+        }
+
+        function restoreSubmitButton() {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Convert & download';
+        }
+
+        function resetInterface() {
+            if (pollTimer) clearTimeout(pollTimer);
+            pollTimer = null;
+            form.reset();
+            translatingContainer.hidden = true;
+            downloadLinkContainer.hidden = true;
+            downloadLink.href = '#';
+            downloadLink.removeAttribute('download');
+            downloadLink.textContent = 'Download converted subtitle';
+            setProgress(0, 'Preparing subtitle…');
+            restoreSubmitButton();
+        }
+
+        async function pollProgress(url) {
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store',
+                });
+                const job = await response.json();
+                if (!response.ok) throw new Error(job.error || 'Unable to read conversion progress.');
+
+                setProgress(job.progress, job.message);
+                if (job.status === 'done') {
+                    downloadLink.href = job.download_url;
+                    downloadLink.download = job.filename;
+                    downloadLink.textContent = `Download ${job.filename}`;
+                    downloadLinkContainer.hidden = false;
+                    restoreSubmitButton();
+                    downloadLink.onclick = () => setTimeout(resetInterface, 1500);
+                    return;
+                }
+                if (job.status === 'error') {
+                    restoreSubmitButton();
+                    return;
+                }
+                pollTimer = setTimeout(() => pollProgress(url), 500);
+            } catch (error) {
+                setProgress(0, error.message || 'The connection was interrupted. Please try again.');
+                restoreSubmitButton();
+            }
         }
 
         targetLanguageSelect.addEventListener('change', updateTranslationOutputOptions);
@@ -431,51 +483,37 @@
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             const formData = new FormData(form);
+            formData.append('async_job', '1');
             translatingContainer.hidden = false;
             downloadLinkContainer.hidden = true;
             submitButton.disabled = true;
             submitButton.textContent = 'Processing…';
-            statusCopy.textContent = targetLanguageSelect.value === 'none' ? 'Converting subtitle…' : 'Translating and converting subtitle…';
+            setProgress(0, 'Uploading subtitle…');
 
             const request = new XMLHttpRequest();
             request.open('POST', form.action || window.location.pathname);
             request.setRequestHeader('X-CSRFToken', formData.get('csrfmiddlewaretoken'));
-            request.responseType = 'blob';
+            request.responseType = 'json';
 
-            request.onload = async function () {
-                translatingContainer.hidden = true;
-                if (request.status === 200) {
-                    const filename = filenameFromHeader(request.getResponseHeader('Content-Disposition'));
-                    const objectUrl = URL.createObjectURL(request.response);
-                    downloadLink.href = objectUrl;
-                    downloadLink.download = filename;
-                    downloadLink.textContent = `Download ${filename}`;
-                    downloadLinkContainer.hidden = false;
-                    downloadLink.onclick = () => setTimeout(() => {
-                        URL.revokeObjectURL(objectUrl);
-                        form.reset();
-                        translatingContainer.hidden = true;
-                        downloadLinkContainer.hidden = true;
-                        downloadLink.href = '#';
-                        downloadLink.removeAttribute('download');
-                        downloadLink.textContent = 'Download converted subtitle';
-                        statusCopy.textContent = 'Processing subtitle…';
-                    }, 1500);
+            request.upload.onprogress = function (uploadEvent) {
+                if (uploadEvent.lengthComputable) {
+                    setProgress((uploadEvent.loaded / uploadEvent.total) * 5, 'Uploading subtitle…');
+                }
+            };
+
+            request.onload = function () {
+                if (request.status === 202 && request.response?.progress_url) {
+                    setProgress(5, 'Upload complete; waiting to process');
+                    pollProgress(request.response.progress_url);
                 } else {
-                    const message = await request.response.text();
-                    statusCopy.textContent = message || 'The subtitle could not be processed. Please check the file and try again.';
-                    translatingContainer.hidden = false;
+                    setProgress(0, request.response?.error || 'The subtitle could not be processed. Please check the file and try again.');
+                    restoreSubmitButton();
                 }
             };
 
             request.onerror = function () {
-                statusCopy.textContent = 'The connection was interrupted. Please try again.';
-                translatingContainer.hidden = false;
-            };
-
-            request.onloadend = function () {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Convert & download';
+                setProgress(0, 'The connection was interrupted. Please try again.');
+                restoreSubmitButton();
             };
 
             request.send(formData);

@@ -1,5 +1,8 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.urls import reverse
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 import pysubs2
 import os
 import asyncio
@@ -7,6 +10,7 @@ import re
 import logging
 import requests
 import tempfile
+import time
 from urllib.parse import quote
 import uuid
 
@@ -20,10 +24,54 @@ MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {'.srt', '.ass', '.ssa', '.vtt'}
 SUPPORTED_TARGET_LANGUAGES = {'none', 'en', 'zh-cn', 'es', 'fr'}
 SUPPORTED_TRANSLATION_MODES = {'bilingual', 'translated'}
+JOB_TTL_SECONDS = 15 * 60
+MAX_ACTIVE_JOBS = 8
+
+job_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='subchange-job')
+job_lock = Lock()
+conversion_jobs = {}
 
 
 class TranslationError(Exception):
     """Raised when the upstream translation service cannot return valid data."""
+
+
+def _remove_file(path):
+    if path and os.path.exists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            logger.exception("临时文件删除失败: %s", path)
+
+
+def _cleanup_expired_jobs():
+    cutoff = time.time() - JOB_TTL_SECONDS
+    expired = []
+    with job_lock:
+        for job_id, job in conversion_jobs.items():
+            if job['status'] in {'done', 'error'} and job['updated_at'] < cutoff:
+                expired.append((job_id, job.get('output_path')))
+        for job_id, _ in expired:
+            conversion_jobs.pop(job_id, None)
+    for _, output_path in expired:
+        _remove_file(output_path)
+
+
+def _update_job(job_id, **changes):
+    with job_lock:
+        job = conversion_jobs.get(job_id)
+        if not job:
+            return
+        job.update(changes)
+        job['updated_at'] = time.time()
+
+
+def _content_disposition(filename):
+    encoded_filename = quote(filename.encode('utf-8'))
+    return (
+        f'attachment; filename="{encoded_filename}";'
+        f"filename*=UTF-8''{encoded_filename}"
+    )
 
 
 def _translation_batches(texts):
@@ -74,7 +122,7 @@ def _request_translation_batch(texts, target_language):
 
     return translated
 
-async def translate_text_bulk(texts, target_language):
+async def translate_text_bulk(texts, target_language, progress_callback=None):
     """
     分批调用 Google Chrome 翻译端点，避免 googletrans 在被限流时无限等待。
     在翻译前后都进行文本清洗，彻底移除多余的回车、转义字符和孤立的 'n'、'\\N'。
@@ -99,13 +147,16 @@ async def translate_text_bulk(texts, target_language):
 
         async def translate_all_batches():
             results = []
-            for batch in _translation_batches(cleaned_texts):
+            batches = list(_translation_batches(cleaned_texts))
+            for index, batch in enumerate(batches, start=1):
                 translated_batch = await asyncio.to_thread(
                     _request_translation_batch,
                     batch,
                     target_language,
                 )
                 results.extend(translated_batch)
+                if progress_callback:
+                    progress_callback(index, len(batches))
             return results
 
         translated_texts_pre_clean = await asyncio.wait_for(
@@ -144,6 +195,8 @@ async def subtitle_convert_and_download(
     custom_filename,
     target_language,
     translation_mode='bilingual',
+    append_unique_suffix=True,
+    progress_callback=None,
 ):
 
     
@@ -156,6 +209,9 @@ async def subtitle_convert_and_download(
     :param translation_mode: bilingual 为译文加原文，translated 为仅保留译文
     :return: HttpResponse 对象，包含转换后的文件内容
     """
+    if progress_callback:
+        progress_callback(12, 'Reading subtitle structure')
+
     if target_language != 'none':
         text_segments_to_translate = []
         original_segments_structure = []
@@ -191,7 +247,16 @@ async def subtitle_convert_and_download(
             line.original_text = "".join(original_line_parts)
 
         # 2. 批量翻译清洗后的文本
-        translated_segments = await translate_text_bulk(text_segments_to_translate, target_language)
+        def report_translation(completed, total):
+            if progress_callback:
+                percent = 18 + round(67 * completed / max(total, 1))
+                progress_callback(percent, f'Translating batch {completed} of {total}')
+
+        translated_segments = await translate_text_bulk(
+            text_segments_to_translate,
+            target_language,
+            report_translation,
+        )
         translated_segments_list, cleaned_texts_list = translated_segments # 解包返回的元组
         # 分别为这两个列表创建迭代器
         translated_segments_iterator = iter(translated_segments_list)
@@ -232,12 +297,17 @@ async def subtitle_convert_and_download(
                 line.text = translated_text_line + "\n" + cleaned_text_line
             # print(f"双语字幕行: {line.text}") # 打印双语字幕行
 
+        if progress_callback:
+            progress_callback(90, 'Assembling translated subtitles')
+    elif progress_callback:
+        progress_callback(85, 'Preparing converted subtitles')
+
     # 后续处理 (保存文件和返回 response) 与之前代码相同
     # 生成唯一的文件名
-    unique_id = uuid.uuid4().hex[:8]  # 使用 UUID 的前 8 位，确保唯一性且文件名长度适中
+    unique_id = uuid.uuid4().hex[:8]  # 自动命名时避免浏览器下载重名
     if custom_filename:
-        # 如果用户提供了自定义文件名，将其与 UUID 结合
-        response_filename = f"{custom_filename}_{unique_id}.{subtitle_format}"
+        suffix = f"_{unique_id}" if append_unique_suffix else ""
+        response_filename = f"{custom_filename}{suffix}.{subtitle_format}"
     else:
         # 如果没有自定义文件名，使用默认前缀加上 UUID
         response_filename = f"converted_{unique_id}.{subtitle_format}"
@@ -250,16 +320,17 @@ async def subtitle_convert_and_download(
         converted_file_path = converted_file.name
 
     try:
+        if progress_callback:
+            progress_callback(94, 'Writing output file')
         subs.save(converted_file_path, format=subtitle_format)
         with open(converted_file_path, 'rb') as f:
             converted_subtitle = f.read()
 
         response = HttpResponse(converted_subtitle, content_type='text/plain')
-        encoded_filename = quote(response_filename.encode('utf-8'))
-        response['Content-Disposition'] = (
-            f'attachment; filename="{encoded_filename}";'
-            f"filename*=UTF-8''{encoded_filename}"
-        )
+        response['Content-Disposition'] = _content_disposition(response_filename)
+        response.subchange_filename = response_filename
+        if progress_callback:
+            progress_callback(97, 'Finalizing download')
         logger.info(
             "字幕文件 '%s' 译成 '%s' 以 '%s' 格式转换成功，准备提供下载。",
             response_filename,
@@ -270,6 +341,134 @@ async def subtitle_convert_and_download(
     finally:
         if os.path.exists(converted_file_path):
             os.remove(converted_file_path)
+
+
+def _run_conversion_job(
+    job_id,
+    temp_path,
+    subtitle_format,
+    custom_filename,
+    target_language,
+    translation_mode,
+    append_unique_suffix,
+):
+    output_path = None
+    try:
+        _update_job(job_id, status='processing', progress=8, message='Loading subtitle file')
+        subs = pysubs2.load(temp_path)
+
+        def report_progress(percent, message):
+            _update_job(
+                job_id,
+                progress=max(8, min(int(percent), 99)),
+                message=message,
+            )
+
+        response = asyncio.run(
+            subtitle_convert_and_download(
+                subs,
+                subtitle_format,
+                custom_filename,
+                target_language,
+                translation_mode,
+                append_unique_suffix,
+                report_progress,
+            )
+        )
+
+        with tempfile.NamedTemporaryFile(
+            prefix='subchange-job-output-',
+            suffix=f'.{subtitle_format}',
+            delete=False,
+        ) as output_file:
+            output_file.write(response.content)
+            output_path = output_file.name
+
+        _update_job(
+            job_id,
+            status='done',
+            progress=100,
+            message='Download ready',
+            output_path=output_path,
+            filename=response.subchange_filename,
+        )
+    except TranslationError as exc:
+        _remove_file(output_path)
+        _update_job(
+            job_id,
+            status='error',
+            progress=100,
+            message=f'翻译失败：{exc}',
+        )
+    except Exception:
+        _remove_file(output_path)
+        logger.exception("后台字幕转换失败")
+        _update_job(
+            job_id,
+            status='error',
+            progress=100,
+            message='字幕文件无法处理，请检查文件格式后重试',
+        )
+    finally:
+        _remove_file(temp_path)
+
+
+def conversion_progress(request, job_id):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    _cleanup_expired_jobs()
+    job_key = str(job_id)
+    with job_lock:
+        job = conversion_jobs.get(job_key)
+        if not job:
+            return JsonResponse({'error': '转换任务不存在或已过期'}, status=404)
+        payload = {
+            'status': job['status'],
+            'progress': job['progress'],
+            'message': job['message'],
+        }
+        if job['status'] == 'done':
+            payload['filename'] = job['filename']
+            payload['download_url'] = reverse(
+                'conversion_download',
+                kwargs={'job_id': job_id},
+            )
+
+    response = JsonResponse(payload)
+    response['Cache-Control'] = 'no-store'
+    return response
+
+
+def conversion_download(request, job_id):
+    if request.method != 'GET':
+        return HttpResponse("Method not allowed", status=405)
+
+    job_key = str(job_id)
+    with job_lock:
+        job = conversion_jobs.get(job_key)
+        if not job:
+            return HttpResponse("转换任务不存在或已过期", status=404)
+        if job['status'] != 'done':
+            return HttpResponse("转换任务尚未完成", status=409)
+        output_path = job.get('output_path')
+        filename = job.get('filename', 'converted.srt')
+
+    try:
+        with open(output_path, 'rb') as output_file:
+            content = output_file.read()
+    except OSError:
+        logger.exception("转换结果读取失败: %s", output_path)
+        return HttpResponse("转换结果已失效，请重新转换", status=410)
+
+    with job_lock:
+        conversion_jobs.pop(job_key, None)
+    _remove_file(output_path)
+
+    response = HttpResponse(content, content_type='text/plain')
+    response['Content-Disposition'] = _content_disposition(filename)
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 async def subtitle_convert(request):
@@ -294,11 +493,25 @@ async def subtitle_convert(request):
         if translation_mode not in SUPPORTED_TRANSLATION_MODES:
             return HttpResponse("不支持的翻译输出模式", status=400)
 
-        custom_filename = request.POST.get('custom_filename', 'converted')
-        if not custom_filename:
-            custom_filename = os.path.splitext(subtitle_file.name)[0]
-        custom_filename = os.path.basename(custom_filename.strip())
+        requested_filename = request.POST.get('custom_filename', '').strip()
+        append_unique_suffix = not bool(requested_filename)
+        custom_filename = requested_filename or os.path.splitext(subtitle_file.name)[0]
+        custom_filename = os.path.basename(custom_filename)
         custom_filename = re.sub(r'[^\w.-]+', '_', custom_filename)[:100] or 'converted'
+
+        use_background_job = request.POST.get('async_job') == '1'
+        if use_background_job:
+            _cleanup_expired_jobs()
+            with job_lock:
+                active_jobs = sum(
+                    job['status'] in {'queued', 'processing'}
+                    for job in conversion_jobs.values()
+                )
+            if active_jobs >= MAX_ACTIVE_JOBS:
+                return JsonResponse(
+                    {'error': '服务器正在处理较多任务，请稍后重试'},
+                    status=429,
+                )
 
         with tempfile.NamedTemporaryFile(
             prefix='subchange-upload-',
@@ -309,6 +522,50 @@ async def subtitle_convert(request):
                 uploaded_file.write(chunk)
             temp_path = uploaded_file.name
 
+        if use_background_job:
+            job_id = str(uuid.uuid4())
+            now = time.time()
+            with job_lock:
+                conversion_jobs[job_id] = {
+                    'status': 'queued',
+                    'progress': 5,
+                    'message': 'Upload complete; waiting to process',
+                    'created_at': now,
+                    'updated_at': now,
+                    'output_path': None,
+                    'filename': None,
+                }
+            try:
+                job_executor.submit(
+                    _run_conversion_job,
+                    job_id,
+                    temp_path,
+                    subtitle_format,
+                    custom_filename,
+                    target_language,
+                    translation_mode,
+                    append_unique_suffix,
+                )
+            except Exception:
+                with job_lock:
+                    conversion_jobs.pop(job_id, None)
+                _remove_file(temp_path)
+                logger.exception("字幕转换任务提交失败")
+                return JsonResponse({'error': '转换任务无法启动，请稍后重试'}, status=503)
+
+            response = JsonResponse(
+                {
+                    'job_id': job_id,
+                    'progress_url': reverse(
+                        'conversion_progress',
+                        kwargs={'job_id': job_id},
+                    ),
+                },
+                status=202,
+            )
+            response['Cache-Control'] = 'no-store'
+            return response
+
         try:
             subs = pysubs2.load(temp_path)
             return await subtitle_convert_and_download(
@@ -317,6 +574,7 @@ async def subtitle_convert(request):
                 custom_filename,
                 target_language,
                 translation_mode,
+                append_unique_suffix,
             )
         except TranslationError as exc:
             return HttpResponse(f"翻译失败：{exc}", status=502)
