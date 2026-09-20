@@ -208,20 +208,19 @@
         .process-status, .download-status { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line-strong); }
         .process-line {
             display: grid;
-            grid-template-columns: repeat(72, minmax(1px, 1fr));
-            align-items: end;
-            gap: 2px;
-            height: 16px;
+            grid-template-columns: repeat(120, 1px);
+            align-items: center;
+            justify-content: space-between;
+            height: 12px;
         }
         .process-line i {
-            justify-self: center;
             width: 1px;
-            height: 7px;
+            height: 10px;
             background: var(--line-strong);
-            opacity: 0.65;
-            transition: height 180ms var(--ease), background 180ms ease, opacity 180ms ease;
+            opacity: 0.4;
+            transition: background-color 90ms linear, opacity 90ms linear;
         }
-        .process-line i.is-active { height: 15px; background: var(--ink); opacity: 1; }
+        .process-line i.is-active { background: var(--ink); opacity: 1; }
         .status-copy { display: flex; justify-content: space-between; gap: 1rem; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
         .status-copy strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .download-link { margin-top: 0.75rem; background: transparent; color: var(--ink); }
@@ -425,7 +424,7 @@
         const statusMessage = document.getElementById('status-message');
         const progressPercent = document.getElementById('progress-percent');
         const progressTrack = document.getElementById('progress-track');
-        const PROGRESS_TICK_COUNT = 72;
+        const PROGRESS_TICK_COUNT = 120;
         const progressTicks = Array.from({ length: PROGRESS_TICK_COUNT }, () => {
             const tick = document.createElement('i');
             tick.setAttribute('aria-hidden', 'true');
@@ -433,6 +432,8 @@
             return tick;
         });
         let pollTimer = null;
+        let progressAnimationFrame = null;
+        let displayedProgress = 0;
 
         function updateTranslationOutputOptions() {
             const enabled = targetLanguageSelect.value !== 'none';
@@ -440,15 +441,42 @@
             translationModeSelect.disabled = !enabled;
         }
 
-        function setProgress(value, message) {
+        function renderProgress(value) {
+            displayedProgress = value;
             const percent = Math.max(0, Math.min(100, Math.round(value)));
-            const activeTickCount = Math.ceil((percent / 100) * PROGRESS_TICK_COUNT);
+            const activeTickCount = Math.round((value / 100) * PROGRESS_TICK_COUNT);
             progressTicks.forEach((tick, index) => {
                 tick.classList.toggle('is-active', index < activeTickCount);
             });
             progressPercent.textContent = `${percent}%`;
             progressTrack.setAttribute('aria-valuenow', percent);
+        }
+
+        function setProgress(value, message) {
+            const target = Math.max(0, Math.min(100, Number(value) || 0));
             if (message) statusMessage.textContent = message;
+
+            if (progressAnimationFrame) cancelAnimationFrame(progressAnimationFrame);
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (target <= displayedProgress || reduceMotion) {
+                progressAnimationFrame = null;
+                renderProgress(target);
+                return;
+            }
+
+            const start = displayedProgress;
+            const startTime = performance.now();
+            const duration = Math.min(600, Math.max(160, (target - start) * 12));
+            const advance = (now) => {
+                const elapsed = Math.min(1, (now - startTime) / duration);
+                renderProgress(start + ((target - start) * elapsed));
+                if (elapsed < 1) {
+                    progressAnimationFrame = requestAnimationFrame(advance);
+                } else {
+                    progressAnimationFrame = null;
+                }
+            };
+            progressAnimationFrame = requestAnimationFrame(advance);
         }
 
         function restoreSubmitButton() {
