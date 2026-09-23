@@ -211,6 +211,7 @@
         .status-copy strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .download-link { margin-top: 0.75rem; background: transparent; color: var(--ink); }
         .download-link:hover { background: var(--ink); color: var(--paper); }
+        .download-link[aria-disabled="true"] { pointer-events: none; opacity: 0.55; }
 
         .index-strip {
             display: grid;
@@ -438,6 +439,7 @@
         let currentLanguage = 'en';
         let currentStatusMessage = 'Preparing subtitle…';
         let currentDownloadFilename = null;
+        let downloadInProgress = false;
 
         const englishText = Object.fromEntries(
             [...document.querySelectorAll('[data-i18n]')].map((element) => [element.dataset.i18n, element.textContent])
@@ -480,6 +482,8 @@
             'Writing output file': '正在写入输出文件',
             'Finalizing download': '正在准备下载',
             'Download ready': '文件已准备好',
+            'Downloading subtitle…': '正在下载字幕…',
+            'The download failed. Please convert again.': '下载失败，请重新转换。',
             'Unable to read conversion progress.': '无法读取转换进度。',
             'The connection was interrupted. Please try again.': '连接中断，请重试。',
             'The subtitle could not be processed. Please check the file and try again.': '字幕处理失败，请检查文件后重试。',
@@ -610,6 +614,36 @@
             restoreSubmitButton();
         }
 
+        async function downloadConvertedFile(event) {
+            event.preventDefault();
+            if (downloadInProgress || !currentDownloadFilename) return;
+            downloadInProgress = true;
+            downloadLink.setAttribute('aria-disabled', 'true');
+            setProgress(100, 'Downloading subtitle…');
+
+            try {
+                const response = await fetch(downloadLink.href, { cache: 'no-store' });
+                if (!response.ok) throw new Error('Download failed');
+                const file = await response.blob();
+                const objectUrl = URL.createObjectURL(file);
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = currentDownloadFilename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+                resetInterface();
+            } catch (error) {
+                downloadLinkContainer.hidden = true;
+                translatingContainer.hidden = false;
+                setProgress(0, 'The download failed. Please convert again.');
+            } finally {
+                downloadInProgress = false;
+                downloadLink.removeAttribute('aria-disabled');
+            }
+        }
+
         async function pollProgress(url) {
             try {
                 const response = await fetch(url, {
@@ -627,7 +661,6 @@
                     downloadLink.textContent = `${dynamicText[currentLanguage].downloadFile} ${job.filename}`;
                     downloadLinkContainer.hidden = false;
                     restoreSubmitButton();
-                    downloadLink.onclick = () => setTimeout(resetInterface, 1500);
                     return;
                 }
                 if (job.status === 'error') {
@@ -642,6 +675,7 @@
         }
 
         targetLanguageSelect.addEventListener('change', updateTranslationOutputOptions);
+        downloadLink.addEventListener('click', downloadConvertedFile);
         form.addEventListener('reset', () => setTimeout(() => {
             updateTranslationOutputOptions();
             refreshSelectedFileName();
