@@ -16,6 +16,7 @@ Subchange is a lightweight Django web service for converting and translating sub
 - Preserve common timing, bracketed text, and italic subtitle structures.
 - Remove temporary upload and output files after each response.
 - Enforce a 5 MB upload limit.
+- Read UTF-8, UTF-16, and GB18030 encoded subtitle files, including older Chinese subtitles.
 - Switch the website interface between English and Simplified Chinese from the top-left button; the choice is remembered in the browser.
 
 ## Live service
