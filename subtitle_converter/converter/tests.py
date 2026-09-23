@@ -16,7 +16,7 @@ class SubtitleEncodingTests(SimpleTestCase):
             'translation_mode': 'translated',
             'format': 'srt',
             'custom_filename': 'english-result',
-        })
+        }, secure=True, HTTP_HOST='mail.cenship.xyz')
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('Hello world.', response.content.decode('utf-8-sig'))
