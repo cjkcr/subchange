@@ -8,6 +8,7 @@ import os
 import asyncio
 import re
 import logging
+import codecs
 import requests
 import tempfile
 import time
@@ -34,6 +35,31 @@ conversion_jobs = {}
 
 class TranslationError(Exception):
     """Raised when the upstream translation service cannot return valid data."""
+
+
+def _load_subtitles(path):
+    """Read common subtitle encodings without assuming every upload is UTF-8."""
+    with open(path, 'rb') as subtitle_file:
+        content = subtitle_file.read()
+    sample = content[:4096]
+
+    if content.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
+        encoding = 'utf-32'
+    elif content.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        encoding = 'utf-16'
+    elif content.startswith(codecs.BOM_UTF8):
+        encoding = 'utf-8-sig'
+    elif sample.count(b'\x00') > len(sample) // 4:
+        encoding = 'utf-16-le' if sample[1::2].count(0) > sample[::2].count(0) else 'utf-16-be'
+    else:
+        try:
+            content.decode('utf-8')
+            encoding = 'utf-8'
+        except UnicodeDecodeError:
+            content.decode('gb18030')
+            encoding = 'gb18030'
+
+    return pysubs2.load(path, encoding=encoding)
 
 
 def _remove_file(path):
@@ -355,7 +381,7 @@ def _run_conversion_job(
     output_path = None
     try:
         _update_job(job_id, status='processing', progress=8, message='Loading subtitle file')
-        subs = pysubs2.load(temp_path)
+        subs = _load_subtitles(temp_path)
 
         def report_progress(percent, message):
             _update_job(
@@ -567,7 +593,7 @@ async def subtitle_convert(request):
             return response
 
         try:
-            subs = pysubs2.load(temp_path)
+            subs = _load_subtitles(temp_path)
             return await subtitle_convert_and_download(
                 subs,
                 subtitle_format,
