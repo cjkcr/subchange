@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Convert and translate SRT, ASS, SSA, and VTT subtitle files.">
+    <meta name="description" content="Convert and translate SRT, ASS, SSA, and VTT subtitle files." id="page-description">
     <title>Subchange — Subtitle Converter</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'converter/favicon.svg' %}?v=2">
     <style>
@@ -50,7 +50,10 @@
             letter-spacing: 0.16em;
             text-transform: uppercase;
         }
+        .masthead__left { display: flex; align-items: center; gap: clamp(0.75rem, 2vw, 2rem); min-width: 0; }
         .brand { font-family: var(--serif); font-size: 1.15rem; letter-spacing: -0.02em; text-transform: none; }
+        .language-toggle { padding: 0.35rem 0; border: 0; border-bottom: 1px solid var(--line-strong); border-radius: 0; background: transparent; color: var(--ink); cursor: pointer; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; white-space: nowrap; }
+        .language-toggle:hover { border-color: var(--ink); }
         .masthead__center { color: var(--muted); }
         .masthead__right { justify-self: end; }
         .masthead a { text-decoration-thickness: 1px; }
@@ -154,30 +157,12 @@
             background: transparent;
             color: var(--ink);
         }
-        .field input[type="file"] {
-            width: 100%;
-            min-height: 58px;
-            padding: 0.45rem;
-            border: 1px solid var(--line-strong);
-            border-radius: 0;
-            background: transparent;
-            color: var(--muted);
-        }
-        .field input[type="file"]::file-selector-button {
-            min-height: 44px;
-            margin-right: 1rem;
-            padding: 0 1rem;
-            border: 0;
-            border-right: 1px solid var(--line-strong);
-            background: transparent;
-            color: var(--ink);
-            cursor: pointer;
-            font-size: 0.7rem;
-            font-weight: 600;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-        }
-        .field input:focus-visible, .field select:focus-visible, .submit-button:focus-visible, .download-link:focus-visible, a:focus-visible {
+        .field input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); }
+        .field .file-picker { display: flex; align-items: center; min-height: 58px; margin: 0; border: 1px solid var(--line-strong); color: var(--muted); cursor: pointer; font-size: 0.76rem; font-weight: 400; letter-spacing: normal; text-transform: none; }
+        .file-picker__action { display: inline-flex; align-items: center; align-self: stretch; flex: 0 0 auto; padding: 0 1rem; border-right: 1px solid var(--line-strong); color: var(--ink); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+        .file-picker__name { min-width: 0; padding: 0 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .field input:focus-visible, .field select:focus-visible, .submit-button:focus-visible, .download-link:focus-visible, .language-toggle:focus-visible, a:focus-visible,
+        .field input[type="file"]:focus-visible + .file-picker {
             outline: 2px solid var(--ink);
             outline-offset: 4px;
         }
@@ -252,6 +237,13 @@
         .footer p { margin: 0; }
         .footer p:last-child { justify-self: end; text-align: right; }
 
+        html:lang(zh-CN) body { font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; }
+        html:lang(zh-CN) h1, html:lang(zh-CN) .converter-panel h2, html:lang(zh-CN) .hero__deck p, html:lang(zh-CN) .index-intro p { font-family: "Songti SC", "Noto Serif CJK SC", "SimSun", serif; }
+        html:lang(zh-CN) h1 { max-width: none; font-size: clamp(3.1rem, 6.7vw, 6.4rem); line-height: 1.15; letter-spacing: -0.045em; white-space: nowrap; }
+        html:lang(zh-CN) .converter-panel h2 { line-height: 1.15; }
+        html:lang(zh-CN) .eyebrow, html:lang(zh-CN) .section-label, html:lang(zh-CN) .field label, html:lang(zh-CN) .figure-label, html:lang(zh-CN) .micro-label { letter-spacing: 0.08em; }
+        html:lang(zh-CN) .submit-button, html:lang(zh-CN) .download-link, html:lang(zh-CN) .file-picker__action { letter-spacing: 0.08em; }
+
         @media (max-width: 900px) {
             .page-shell { width: min(100% - 2rem, 1440px); }
             .masthead { grid-template-columns: 1fr auto; }
@@ -267,6 +259,7 @@
             .page-shell { width: min(100% - 1.25rem, 1440px); }
             .masthead__right { font-size: 0; }
             .masthead__right::after { content: "LIVE"; font-size: 0.68rem; }
+            html:lang(zh-CN) .masthead__right::after { content: "在线"; }
             .hero { padding: 2.75rem 0 3.25rem; }
             .eyebrow { max-width: 100%; font-size: 0.58rem; letter-spacing: 0.14em; line-height: 1.65; overflow-wrap: anywhere; }
             h1 { max-width: 100%; font-size: clamp(3.1rem, 13.5vw, 4.25rem); letter-spacing: -0.06em; }
@@ -288,32 +281,32 @@
     </style>
 </head>
 <body>
-    <a class="skip-link" href="#converter">Skip to converter</a>
+    <a class="skip-link" href="#converter" data-i18n="skip">Skip to converter</a>
     <div class="page-shell">
         <header class="masthead">
-            <div class="brand">Subchange</div>
-            <div class="masthead__center">Issue 01 / Subtitle Tools</div>
-            <div class="masthead__right"><a href="https://github.com/cjkcr/subchange">Open source on GitHub</a></div>
+            <div class="masthead__left"><div class="brand">Subchange</div><button class="language-toggle" id="language-toggle" type="button" aria-label="Switch to Chinese">中文</button></div>
+            <div class="masthead__center" data-i18n="issue">Issue 01 / Subtitle Tools</div>
+            <div class="masthead__right"><a href="https://github.com/cjkcr/subchange" data-i18n="githubTop">Open source on GitHub</a></div>
         </header>
 
         <main>
             <section class="hero" aria-labelledby="page-title">
                 <div class="hero__title">
-                    <span class="eyebrow">Format conversion · Translation · Bilingual output</span>
-                    <h1 id="page-title">Subtitles,<br><em>reconsidered.</em></h1>
+                    <span class="eyebrow" data-i18n="eyebrow">Format conversion · Translation · Bilingual output</span>
+                    <h1 id="page-title"><span data-i18n="heroFirst">Subtitles,</span><br><em data-i18n="heroSecond">reconsidered.</em></h1>
                 </div>
                 <div class="hero__deck">
-                    <p>A precise workspace for moving subtitles between formats—and languages—without adding noise to the process.</p>
-                    <small>SRT / ASS / SSA / VTT · Up to 5 MB</small>
+                    <p data-i18n="heroDeck">A precise workspace for moving subtitles between formats—and languages—without adding noise to the process.</p>
+                    <small data-i18n="heroFormats">SRT / ASS / SSA / VTT · Up to 5 MB</small>
                 </div>
             </section>
 
             <section class="workspace" id="converter" aria-labelledby="converter-title">
                 <figure class="editorial-figure">
-                    <span class="figure-label">Fig. 01 — Speech / Time</span>
+                    <span class="figure-label" data-i18n="figureLabel">Fig. 01 — Speech / Time</span>
                     <svg viewBox="0 0 600 780" role="img" aria-labelledby="visual-title visual-desc" preserveAspectRatio="xMidYMid slice">
-                        <title id="visual-title">Abstract subtitle timeline</title>
-                        <desc id="visual-desc">An editorial composition of timing lines, subtitle frames, and typographic marks.</desc>
+                        <title id="visual-title" data-i18n="figureTitle">Abstract subtitle timeline</title>
+                        <desc id="visual-desc" data-i18n="figureDesc">An editorial composition of timing lines, subtitle frames, and typographic marks.</desc>
                         <rect width="600" height="780" fill="#1c1c1c"/>
                         <g fill="none" stroke="#f3f1ea" stroke-opacity="0.28">
                             <path d="M48 116H552M48 196H552M48 276H552M48 356H552M48 436H552M48 516H552M48 596H552"/>
@@ -324,49 +317,50 @@
                             <rect x="170" y="216" width="306" height="8"/>
                             <rect x="214" y="246" width="238" height="8" opacity="0.58"/>
                             <text x="52" y="414" font-family="Arial, sans-serif" font-size="14" letter-spacing="4">00:01:24,080</text>
-                            <text x="52" y="470" font-family="Georgia, serif" font-size="36">Meaning survives</text>
-                            <text x="178" y="514" font-family="Georgia, serif" font-size="36" font-style="italic">the format.</text>
+                            <text x="52" y="470" font-family="Georgia, serif" font-size="36" data-i18n="figureLineOne">Meaning survives</text>
+                            <text x="178" y="514" font-family="Georgia, serif" font-size="36" font-style="italic" data-i18n="figureLineTwo">the format.</text>
                         </g>
                         <g fill="none" stroke="#f3f1ea" stroke-width="2">
                             <path d="M54 570c38-52 74 52 112 0s74 52 112 0 74 52 112 0 74 52 112 0"/>
                         </g>
                     </svg>
-                    <figcaption class="figure-caption"><span>One timeline.<br>Four formats.</span><span>A/01</span></figcaption>
+                    <figcaption class="figure-caption"><span><span data-i18n="figureCaptionOne">One timeline.</span><br><span data-i18n="figureCaptionTwo">Four formats.</span></span><span>A/01</span></figcaption>
                 </figure>
 
                 <div class="converter-panel">
-                    <span class="section-label">The work desk</span>
-                    <h2 id="converter-title">Convert with intent.</h2>
-                    <p class="intro">Upload a subtitle, choose a language and output format, then download the result. Translation can preserve the original line or return the translated line alone.</p>
+                    <span class="section-label" data-i18n="workDesk">The work desk</span>
+                    <h2 id="converter-title" data-i18n="converterTitle">Convert with intent.</h2>
+                    <p class="intro" data-i18n="intro">Upload a subtitle, choose a language and output format, then download the result. Translation can preserve the original line or return the translated line alone.</p>
 
                     <form class="converter-form" id="convert-form" method="POST" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="field field--wide">
-                            <label for="subtitle">01 / Source file</label>
+                            <label for="subtitle" data-i18n="sourceFile">01 / Source file</label>
                             <input id="subtitle" type="file" name="subtitle" accept=".srt,.ass,.ssa,.vtt" required>
-                            <span class="field-help">Accepted: SRT, ASS, SSA, VTT · Maximum file size: 5 MB</span>
+                            <label for="subtitle" class="file-picker"><span class="file-picker__action" data-i18n="chooseFile">Choose file</span><span class="file-picker__name" id="selected-file-name">No file selected</span></label>
+                            <span class="field-help" data-i18n="fileHelp">Accepted: SRT, ASS, SSA, VTT · Maximum file size: 5 MB</span>
                         </div>
 
                         <div class="field-grid">
                             <div class="field">
-                                <label for="target_language">02 / Target language</label>
+                                <label for="target_language" data-i18n="targetLanguage">02 / Target language</label>
                                 <select name="target_language" id="target_language">
-                                    <option value="none">No translation</option>
-                                    <option value="en">English</option>
-                                    <option value="zh-cn">Chinese</option>
-                                    <option value="es">Spanish</option>
-                                    <option value="fr">French</option>
+                                    <option value="none" data-i18n="noTranslation">No translation</option>
+                                    <option value="en" data-i18n="english">English</option>
+                                    <option value="zh-cn" data-i18n="chinese">Chinese</option>
+                                    <option value="es" data-i18n="spanish">Spanish</option>
+                                    <option value="fr" data-i18n="french">French</option>
                                 </select>
                             </div>
                             <div class="field" id="translation-output-options" hidden>
-                                <label for="translation_mode">03 / Translation output</label>
+                                <label for="translation_mode" data-i18n="translationOutput">03 / Translation output</label>
                                 <select name="translation_mode" id="translation_mode">
-                                    <option value="bilingual">Translation + original</option>
-                                    <option value="translated">Translation only</option>
+                                    <option value="bilingual" data-i18n="bilingual">Translation + original</option>
+                                    <option value="translated" data-i18n="translated">Translation only</option>
                                 </select>
                             </div>
                             <div class="field">
-                                <label for="format">04 / Output format</label>
+                                <label for="format" data-i18n="outputFormat">04 / Output format</label>
                                 <select name="format" id="format" required>
                                     <option value="srt">SRT</option>
                                     <option value="ass">ASS</option>
@@ -375,14 +369,14 @@
                                 </select>
                             </div>
                             <div class="field">
-                                <label for="custom_filename">05 / File name</label>
+                                <label for="custom_filename" data-i18n="fileName">05 / File name</label>
                                 <input id="custom_filename" type="text" name="custom_filename" placeholder="converted" maxlength="100">
                             </div>
                         </div>
 
                         <hr class="form-rule">
                         <div class="submit-row">
-                            <p class="submit-note">Files are processed temporarily and removed after the response completes.</p>
+                            <p class="submit-note" data-i18n="submitNote">Files are processed temporarily and removed after the response completes.</p>
                             <button class="submit-button" id="submit-button" type="submit">Convert &amp; download</button>
                         </div>
                     </form>
@@ -392,29 +386,35 @@
                         <p class="status-copy"><span id="status-message">Preparing subtitle…</span><strong id="progress-percent">0%</strong></p>
                     </div>
                     <div class="download-status" id="download-link-container" role="status" aria-live="polite" hidden>
-                        <span class="micro-label">Your file is ready</span>
+                        <span class="micro-label" data-i18n="fileReady">Your file is ready</span>
                         <a class="download-link" id="download-link" href="#">Download converted subtitle</a>
                     </div>
                 </div>
             </section>
 
-            <section class="index-strip" aria-label="Supported formats">
-                <div class="index-intro"><span class="section-label">Format index</span><p>Translation and conversion across the formats that matter.</p></div>
+            <section class="index-strip" aria-label="Supported formats" id="format-index">
+                <div class="index-intro"><span class="section-label" data-i18n="formatIndex">Format index</span><p data-i18n="formatDescription">Translation and conversion across the formats that matter.</p></div>
                 <div class="format-mark"><strong>SRT</strong><small>SubRip</small></div>
-                <div class="format-mark"><strong>ASS</strong><small>Advanced</small></div>
-                <div class="format-mark"><strong>SSA</strong><small>SubStation</small></div>
-                <div class="format-mark"><strong>VTT</strong><small>Web video</small></div>
+                <div class="format-mark"><strong>ASS</strong><small data-i18n="advanced">Advanced</small></div>
+                <div class="format-mark"><strong>SSA</strong><small data-i18n="subStation">SubStation</small></div>
+                <div class="format-mark"><strong>VTT</strong><small data-i18n="webVideo">Web video</small></div>
             </section>
         </main>
 
         <footer class="footer">
-            <p>Subchange / A focused subtitle utility powered by Django and open-source software.</p>
-            <p><a href="https://github.com/cjkcr/subchange">Source on GitHub</a><br>Uploads are not stored permanently.</p>
+            <p data-i18n="footerDescription">Subchange / A focused subtitle utility powered by Django and open-source software.</p>
+            <p><a href="https://github.com/cjkcr/subchange" data-i18n="githubFooter">Source on GitHub</a><br><span data-i18n="footerPrivacy">Uploads are not stored permanently.</span></p>
         </footer>
     </div>
 
     <script>
         const form = document.getElementById('convert-form');
+        const fileInput = document.getElementById('subtitle');
+        const selectedFileName = document.getElementById('selected-file-name');
+        const customFilenameInput = document.getElementById('custom_filename');
+        const languageToggle = document.getElementById('language-toggle');
+        const pageDescription = document.getElementById('page-description');
+        const formatIndex = document.getElementById('format-index');
         const targetLanguageSelect = document.getElementById('target_language');
         const translationOutputOptions = document.getElementById('translation-output-options');
         const translationModeSelect = document.getElementById('translation_mode');
@@ -435,6 +435,115 @@
         let pollTimer = null;
         let progressAnimationFrame = null;
         let displayedProgress = 0;
+        let currentLanguage = 'en';
+        let currentStatusMessage = 'Preparing subtitle…';
+        let currentDownloadFilename = null;
+
+        const englishText = Object.fromEntries(
+            [...document.querySelectorAll('[data-i18n]')].map((element) => [element.dataset.i18n, element.textContent])
+        );
+        const chineseText = {
+            skip: '跳转到转换工具', issue: '第 01 期 / 字幕工具', githubTop: '在 GitHub 查看源码',
+            eyebrow: '格式转换 · 字幕翻译 · 双语输出', heroFirst: '字幕，', heroSecond: '重新定义。',
+            heroDeck: '在格式与语言之间准确转换字幕，让处理过程更清晰、更从容。',
+            heroFormats: 'SRT / ASS / SSA / VTT · 最大 5 MB',
+            figureLabel: '图 01 — 语音 / 时间', figureTitle: '抽象字幕时间轴',
+            figureDesc: '由时间刻度、字幕行和文字标记组成的编辑式画面。',
+            figureLineOne: '意义不随', figureLineTwo: '格式改变。',
+            figureCaptionOne: '一条时间轴。', figureCaptionTwo: '四种格式。',
+            workDesk: '编辑工作台', converterTitle: '让转换恰到好处。',
+            intro: '上传字幕，选择目标语言与输出格式，即可下载结果。翻译时可保留原文，生成双语字幕，也可以仅输出译文。',
+            sourceFile: '01 / 源字幕文件', chooseFile: '选择文件',
+            fileHelp: '支持 SRT、ASS、SSA、VTT · 文件最大 5 MB',
+            targetLanguage: '02 / 目标语言', noTranslation: '不翻译', english: '英语', chinese: '中文',
+            spanish: '西班牙语', french: '法语', translationOutput: '03 / 翻译输出',
+            bilingual: '译文 + 原文', translated: '仅译文', outputFormat: '04 / 输出格式',
+            fileName: '05 / 文件名', submitNote: '文件仅用于本次处理，完成后会自动删除。',
+            fileReady: '文件已生成', formatIndex: '格式一览',
+            formatDescription: '常用字幕格式之间的翻译与转换。',
+            advanced: '高级字幕', subStation: '字幕工作站', webVideo: '网页视频',
+            footerDescription: 'Subchange / 基于 Django 与开源软件的轻量字幕工具。',
+            githubFooter: 'GitHub 源码', footerPrivacy: '上传文件不会被永久保存。',
+        };
+        const dynamicText = {
+            en: { noFile: 'No file selected', submit: 'Convert & download', processing: 'Processing…', download: 'Download converted subtitle', downloadFile: 'Download', placeholder: 'converted' },
+            zh: { noFile: '尚未选择文件', submit: '转换并下载', processing: '正在处理…', download: '下载转换后的字幕', downloadFile: '下载', placeholder: '转换后的字幕' },
+        };
+        const statusChinese = {
+            'Preparing subtitle…': '正在准备字幕…',
+            'Uploading subtitle…': '正在上传字幕…',
+            'Upload complete; waiting to process': '上传完成，等待处理',
+            'Loading subtitle file': '正在读取字幕文件',
+            'Reading subtitle structure': '正在解析字幕结构',
+            'Assembling translated subtitles': '正在整理翻译后的字幕',
+            'Preparing converted subtitles': '正在准备转换后的字幕',
+            'Writing output file': '正在写入输出文件',
+            'Finalizing download': '正在准备下载',
+            'Download ready': '文件已准备好',
+            'Unable to read conversion progress.': '无法读取转换进度。',
+            'The connection was interrupted. Please try again.': '连接中断，请重试。',
+            'The subtitle could not be processed. Please check the file and try again.': '字幕处理失败，请检查文件后重试。',
+        };
+        const statusEnglish = {
+            '转换任务不存在或已过期': 'The conversion job expired. Please try again.',
+            '服务器正在处理较多任务，请稍后重试': 'The server is busy. Please try again later.',
+            '转换任务无法启动，请稍后重试': 'Could not start the conversion. Please try again later.',
+            '字幕文件无法处理，请检查文件格式后重试': 'The subtitle could not be processed. Check the file format and try again.',
+            '翻译服务返回了不完整的数据': 'The translation service returned incomplete data.',
+            '翻译服务返回了无法识别的数据': 'The translation service returned invalid data.',
+            '翻译服务响应超时，请缩短字幕后重试': 'The translation timed out. Try a shorter subtitle file.',
+            '翻译服务暂时不可用，请稍后重试': 'The translation service is unavailable. Please try again later.',
+        };
+
+        function localizeStatus(message) {
+            if (currentLanguage === 'zh') {
+                const batch = /^Translating batch (\d+) of (\d+)$/.exec(message);
+                if (batch) return `正在翻译第 ${batch[1]} / ${batch[2]} 批`;
+                return statusChinese[message] || message;
+            }
+            if (message.startsWith('翻译失败：')) {
+                const reason = message.slice('翻译失败：'.length);
+                return `Translation failed: ${statusEnglish[reason] || 'Please try again later.'}`;
+            }
+            return statusEnglish[message] || message;
+        }
+
+        function refreshSelectedFileName() {
+            selectedFileName.textContent = fileInput.files?.[0]?.name || dynamicText[currentLanguage].noFile;
+        }
+
+        function applyLanguage(language) {
+            currentLanguage = language === 'zh' ? 'zh' : 'en';
+            document.documentElement.lang = currentLanguage === 'zh' ? 'zh-CN' : 'en';
+            document.querySelectorAll('[data-i18n]').forEach((element) => {
+                const key = element.dataset.i18n;
+                element.textContent = currentLanguage === 'zh' ? chineseText[key] : englishText[key];
+            });
+            languageToggle.textContent = currentLanguage === 'zh' ? 'English' : '中文';
+            languageToggle.setAttribute('aria-label', currentLanguage === 'zh' ? '切换到英文' : 'Switch to Chinese');
+            document.title = currentLanguage === 'zh' ? 'Subchange — 字幕转换工具' : 'Subchange — Subtitle Converter';
+            pageDescription.content = currentLanguage === 'zh'
+                ? '转换和翻译 SRT、ASS、SSA、VTT 字幕文件。'
+                : 'Convert and translate SRT, ASS, SSA, and VTT subtitle files.';
+            customFilenameInput.placeholder = dynamicText[currentLanguage].placeholder;
+            progressTrack.setAttribute('aria-label', currentLanguage === 'zh' ? '转换进度' : 'Conversion progress');
+            formatIndex.setAttribute('aria-label', currentLanguage === 'zh' ? '支持的格式' : 'Supported formats');
+            refreshSelectedFileName();
+            statusMessage.textContent = localizeStatus(currentStatusMessage);
+            submitButton.textContent = submitButton.disabled ? dynamicText[currentLanguage].processing : dynamicText[currentLanguage].submit;
+            downloadLink.textContent = currentDownloadFilename
+                ? `${dynamicText[currentLanguage].downloadFile} ${currentDownloadFilename}`
+                : dynamicText[currentLanguage].download;
+        }
+
+        languageToggle.addEventListener('click', () => {
+            const language = currentLanguage === 'en' ? 'zh' : 'en';
+            applyLanguage(language);
+            try { localStorage.setItem('subchange-language', language); } catch (_) { /* Storage may be unavailable. */ }
+        });
+        fileInput.addEventListener('change', refreshSelectedFileName);
+        try { applyLanguage(localStorage.getItem('subchange-language')); }
+        catch (_) { applyLanguage('en'); }
 
         function updateTranslationOutputOptions() {
             const enabled = targetLanguageSelect.value !== 'none';
@@ -455,7 +564,8 @@
 
         function setProgress(value, message) {
             const target = Math.max(0, Math.min(100, Number(value) || 0));
-            if (message) statusMessage.textContent = message;
+            if (message) currentStatusMessage = message;
+            statusMessage.textContent = localizeStatus(currentStatusMessage);
 
             if (progressAnimationFrame) cancelAnimationFrame(progressAnimationFrame);
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -482,7 +592,7 @@
 
         function restoreSubmitButton() {
             submitButton.disabled = false;
-            submitButton.textContent = 'Convert & download';
+            submitButton.textContent = dynamicText[currentLanguage].submit;
         }
 
         function resetInterface() {
@@ -493,7 +603,9 @@
             downloadLinkContainer.hidden = true;
             downloadLink.href = '#';
             downloadLink.removeAttribute('download');
-            downloadLink.textContent = 'Download converted subtitle';
+            currentDownloadFilename = null;
+            downloadLink.textContent = dynamicText[currentLanguage].download;
+            refreshSelectedFileName();
             setProgress(0, 'Preparing subtitle…');
             restoreSubmitButton();
         }
@@ -511,7 +623,8 @@
                 if (job.status === 'done') {
                     downloadLink.href = job.download_url;
                     downloadLink.download = job.filename;
-                    downloadLink.textContent = `Download ${job.filename}`;
+                    currentDownloadFilename = job.filename;
+                    downloadLink.textContent = `${dynamicText[currentLanguage].downloadFile} ${job.filename}`;
                     downloadLinkContainer.hidden = false;
                     restoreSubmitButton();
                     downloadLink.onclick = () => setTimeout(resetInterface, 1500);
@@ -529,7 +642,10 @@
         }
 
         targetLanguageSelect.addEventListener('change', updateTranslationOutputOptions);
-        form.addEventListener('reset', () => setTimeout(updateTranslationOutputOptions, 0));
+        form.addEventListener('reset', () => setTimeout(() => {
+            updateTranslationOutputOptions();
+            refreshSelectedFileName();
+        }, 0));
         updateTranslationOutputOptions();
 
         form.addEventListener('submit', function (event) {
@@ -539,7 +655,7 @@
             translatingContainer.hidden = false;
             downloadLinkContainer.hidden = true;
             submitButton.disabled = true;
-            submitButton.textContent = 'Processing…';
+            submitButton.textContent = dynamicText[currentLanguage].processing;
             setProgress(0, 'Uploading subtitle…');
 
             const request = new XMLHttpRequest();
